@@ -8,9 +8,10 @@ import {RetroReflectPhase_meeting} from '~/__generated__/RetroReflectPhase_meeti
 import useAtmosphere from '../../hooks/useAtmosphere'
 import useBreakpoint from '../../hooks/useBreakpoint'
 import useMutationProps from '../../hooks/useMutationProps'
-import CreateReflectionMutation from '../../mutations/CreateReflectionMutation'
+import BatchCreateReflectionsMutation from '../../mutations/BatchCreateReflectionsMutation'
 import {Breakpoint} from '../../types/constEnums'
 import {phaseLabelLookup} from '../../utils/meetings/lookups'
+import {CreateReflectionInput} from '../../__generated__/BatchCreateReflectionsMutation.graphql'
 import MeetingContent from '../MeetingContent'
 import MeetingHeaderAndPhase from '../MeetingHeaderAndPhase'
 import MeetingTopBar from '../MeetingTopBar'
@@ -57,15 +58,10 @@ const RetroReflectPhase = (props: Props) => {
 
         <Importer
           dataHandler={async (rows: any) => {
-            // required, receives a list of parsed objects based on defined fields and user column mapping;
-            // may be called several times if file is large
-            // (if this callback returns a promise, the widget will wait for it before parsing more data)
-            console.log('received batch of rows', rows)
 
-            rows.map((row: any, idx: number) => {
-              reflectPrompts.map(({id: promptId}) => {
-                if (row[promptId].trim()) {
-                  const input = {
+            const reflections = rows.map((row: any, idx: number) =>
+              reflectPrompts.map(({id: promptId}) =>
+                  ({
                     content: `{"blocks":[{"key":"${(Math.random() + 1)
                       .toString(36)
                       .substring(4)}","text":"${
@@ -74,15 +70,13 @@ const RetroReflectPhase = (props: Props) => {
                     meetingId,
                     promptId,
                     sortOrder: idx
-                  }
-                  submitMutation()
-                  CreateReflectionMutation(atmosphere, {input}, {onError, onCompleted})
-                }
-              })
-            })
+                  })
+              )
+            ).flat()
+            console.log(reflections)
+            submitMutation()
+            BatchCreateReflectionsMutation(atmosphere, {reflections}, {onError, onCompleted})
 
-            // mock timeout to simulate processing
-            await new Promise((resolve) => setTimeout(resolve, 500))
           }}
           chunkSize={10000} // optional, internal parsing chunk size in bytes
           defaultNoHeader={true} // optional, keeps "data has headers" checkbox off by default

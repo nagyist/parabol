@@ -1,0 +1,35 @@
+extend type Mutation {
+  """
+  Batch create nwe reflections
+  """
+  batchCreateReflections(
+    """
+    Array of stringified draft-js document containing reflections
+    """
+    reflections: [CreateReflectionInput!]!
+  ): BatchCreateReflectionsPayload!
+}
+
+"""
+Return value for batchCreateReflections, which could be an error
+"""
+union BatchCreateReflectionsPayload = ErrorPayload | BatchCreateReflectionsSuccess
+
+type BatchCreateReflectionsSuccess {
+  meeting: NewMeeting
+
+  reflectionIds: [ID]
+  reflections: [RetroReflection]
+
+  """
+  The groups automatically created for the reflections
+  """
+  reflectionGroups: [RetroReflectionGroup!]
+
+  """
+  The stages that were unlocked by navigating
+  """
+  unlockedStages: [NewMeetingStage!]
+}
+
+extend union MeetingSubscriptionPayload = BatchCreateReflectionsSuccess

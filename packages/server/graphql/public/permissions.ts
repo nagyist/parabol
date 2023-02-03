@@ -37,7 +37,8 @@ const permissionMap: PermissionMap<Resolvers> = {
       isSuperUser,
       and(isViewerBillingLeader, isOrgTier('enterprise'))
     ),
-    removeApprovedOrganizationDomains: or(isSuperUser, isViewerBillingLeader)
+    removeApprovedOrganizationDomains: or(isSuperUser, isViewerBillingLeader),
+    batchCreateReflections: and(/* isAuthenticated, */ rateLimit({perMinute: 50, perHour: 100})),
   },
   Query: {
     '*': isAuthenticated,
