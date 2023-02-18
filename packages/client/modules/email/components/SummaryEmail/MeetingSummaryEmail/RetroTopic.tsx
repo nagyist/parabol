@@ -5,6 +5,9 @@ import {FONT_FAMILY, ICON_SIZE} from 'parabol-client/styles/typographyV2'
 import plural from 'parabol-client/utils/plural'
 import React from 'react'
 import {useFragment} from 'react-relay'
+import useAtmosphere from '../../../../../hooks/useAtmosphere'
+import useMutationProps from '../../../../../hooks/useMutationProps'
+import ShareTopicMutation from '../../../../../mutations/ShareTopicMutation'
 import {ExternalLinks} from '../../../../../types/constEnums'
 import {APP_CORS_OPTIONS, EMAIL_CORS_OPTIONS} from '../../../../../types/cors'
 import {RetroTopic_stage$key} from '../../../../../__generated__/RetroTopic_stage.graphql'
@@ -76,10 +79,24 @@ interface Props {
 
 const RetroTopic = (props: Props) => {
   const {isDemo, isEmail, to, stageRef} = props
+
+  const atmosphere = useAtmosphere()
+  const {submitting, onError, onCompleted, submitMutation} = useMutationProps()
+
+  const onClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (submitting) return
+    submitMutation()
+    const variables = {reflectionGroupId, userId: atmosphere.viewerId}
+    ShareTopicMutation(atmosphere, variables, {onError, onCompleted})
+  }
+
   const stage = useFragment(
     graphql`
       fragment RetroTopic_stage on RetroDiscussStage {
+        id
         reflectionGroup {
+          id
           title
           voteCount
           reflections {
@@ -96,6 +113,7 @@ const RetroTopic = (props: Props) => {
     stageRef
   )
   const {reflectionGroup, discussion} = stage
+  const {id: reflectionGroupId} = reflectionGroup
   const {commentCount, discussionSummary} = discussion
   const {reflections, title, voteCount, topicSummary} = reflectionGroup!
   const imageSource = isEmail ? 'static' : 'local'
@@ -157,10 +175,15 @@ const RetroTopic = (props: Props) => {
       </tr>
       {!isDemo && (
         <tr>
-          <td align='center'>
+          <td>
             <AnchorIfEmail href={to} isEmail={isEmail} style={commentLinkStyle}>
               {commentLinkLabel}
             </AnchorIfEmail>
+          </td>
+          <td>
+            <a onClick={onClick} style={commentLinkStyle} title='Share this topic'>
+            {`Share this topic`}
+            </a>
           </td>
         </tr>
       )}

@@ -1,0 +1,28 @@
+extend type Mutation {
+  """
+  Describe the mutation here
+  """
+  shareTopic(
+    """
+    reflectionGroupId
+    """
+    reflectionGroupId: ID!
+
+    """
+    userId
+    """
+    userId: ID!
+  ): ShareTopicPayload!
+}
+
+"""
+Return value for shareTopic, which could be an error
+"""
+union ShareTopicPayload = ErrorPayload | ShareTopicSuccess
+
+type ShareTopicSuccess {
+  """
+  Describe the first return field here
+  """
+  meeting: NewMeeting
+}

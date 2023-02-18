@@ -11,4 +11,5 @@ export type Notifier = {
   ): Promise<void>
   endTimeLimit(dataLoader: DataLoaderWorker, meetingId: string, teamId: string): Promise<void>
   integrationUpdated(dataLoader: DataLoaderWorker, teamId: string, userId: string): Promise<void>
+  shareTopic(dataLoader: DataLoaderWorker, teamId: string): Promise<void>
 }

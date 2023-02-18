@@ -14,6 +14,7 @@ export type NotificationIntegration = {
   endMeeting(meeting: Meeting, team: Team): Promise<NotifyResponse>
   startTimeLimit(scheduledEndTime: Date, meeting: Meeting, team: Team): Promise<NotifyResponse>
   endTimeLimit(meeting: Meeting, team: Team): Promise<NotifyResponse>
+  shareTopic(teamId: string): Promise<NotifyResponse>
   integrationUpdated(): Promise<NotifyResponse>
 }
 

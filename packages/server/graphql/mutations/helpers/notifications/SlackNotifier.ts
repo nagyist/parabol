@@ -3,6 +3,7 @@ import formatWeekday from 'parabol-client/utils/date/formatWeekday'
 import makeAppURL from 'parabol-client/utils/makeAppURL'
 import findStageById from 'parabol-client/utils/meetings/findStageById'
 import {phaseLabelLookup} from 'parabol-client/utils/meetings/lookups'
+import {title} from 'process'
 import appOrigin from '../../../../appOrigin'
 import getRethink from '../../../../database/rethinkDriver'
 import Meeting from '../../../../database/types/Meeting'
@@ -229,6 +230,44 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
   async integrationUpdated() {
     // Slack sends a system message on its own
     return 'success'
+  },
+
+  async shareTopic(teamId: string) {
+    const slackBlocks = [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "From [Name]: \n*[Message]*"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Team:*\n[Team]"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Meeting:*\n[Meeting]"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Summary:*\n[summary]"
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*Reflection:* \n-Reflection\n-Reflection\n-Reflection"
+        }
+      }
+    ]
+    const result =  await notifySlack(notificationChannel, 'TOPIC_SHARED', teamId, slackBlocks, 'here should be a title')
+    return result
   }
 })
 
@@ -290,5 +329,11 @@ export const SlackNotifier: Notifier = {
 
   async integrationUpdated() {
     // Slack sends a system message on its own
+  },
+
+  async shareTopic(dataLoader: DataLoaderWorker, teamId: string) {
+    const notifiers = await getSlack(dataLoader, 'TOPIC_SHARED', teamId)
+    console.log(notifiers)
+    notifiers.forEach((notifier) => notifier.shareTopic(teamId))
   }
 }
