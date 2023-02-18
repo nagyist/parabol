@@ -7,6 +7,7 @@ graphql`
   fragment ShareTopicMutation_meeting on ShareTopicSuccess {
     meeting {
       name
+      id
     }
   }
 `
@@ -32,7 +33,27 @@ const ShareTopicMutation: StandardMutation<TShareTopicMutation> = (
   return commitMutation<TShareTopicMutation>(atmosphere, {
     mutation,
     variables,
-    onCompleted,
+    onCompleted: (res, errors) => {
+      if (onCompleted) {
+        onCompleted(res, errors)
+      }
+      const {shareTopic} = res
+      const {meeting} = shareTopic
+      const {id: meetingId} = meeting
+      atmosphere.eventEmitter.emit('addSnackbar', {
+        key: `topicShared:${meetingId}`,
+        autoDismiss: 5,
+        message: `Topic is shared to #growth_retreat_temp_hack_crappy_test`,
+        action: {
+          label: `Check out Slack`,
+          callback: () => {
+            const url =
+              'https://app.slack.com/client/T08FL6336/C04Q273JT6J'
+            window.open(url, '_blank', 'noopener')?.focus()
+          }
+        }
+      })
+    },
     onError
   })
 }

@@ -233,7 +233,7 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
   },
 
   async shareTopic(user, meeting, team, reflectionGroup, reflections) {
-    const reflectionsText = reflections.map((reflection) => `- ${reflection.plaintextContent}`).join('\n')
+    const reflectionsText = reflections.map((reflection) => "```" + reflection.plaintextContent + "```").join('\n')
     const slackBlocks = [
       {
         "type": "section",
@@ -252,7 +252,12 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
           {
             "type": "mrkdwn",
             "text": `*Meeting:*\n${meeting.name}`
-          },
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "fields": [
           {
             "type": "mrkdwn",
             "text": `*Summary:*\n${reflectionGroup.summary}`
@@ -263,7 +268,7 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": `*Reflection:* \n${reflectionsText}`
+          "text": `*Reflections:* \n${reflectionsText}`
         }
       }
     ]
@@ -341,7 +346,6 @@ export const SlackNotifier: Notifier = {
       dataLoader.get('retroReflectionGroups').load(reflectionGroupId),
       r.table('RetroReflection').getAll(reflectionGroupId, {index: 'reflectionGroupId'}).run()
     ])
-    console.log(`teamId = ${teamId}`)
     const notifiers = await getSlack(dataLoader, 'TOPIC_SHARED', teamId)
     notifiers.forEach((notifier) => notifier.shareTopic(user!, meeting, team!, reflectionGroup, reflections))
   }
