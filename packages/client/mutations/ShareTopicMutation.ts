@@ -32,9 +32,6 @@ const ShareTopicMutation: StandardMutation<TShareTopicMutation> = (
   return commitMutation<TShareTopicMutation>(atmosphere, {
     mutation,
     variables,
-    optimisticUpdater: (store) => {
-      const {} = variables
-    },
     onCompleted,
     onError
   })

@@ -29,7 +29,7 @@ const shareTopic: MutationResolvers['shareTopic'] = async (
   // RESOLUTION
   const data = {meetingId}
 
-  SlackNotifier.shareTopic(dataLoader, teamId)
+  SlackNotifier.shareTopic(dataLoader, userId, teamId, meetingId, reflectionGroupId)
 
   return data
 }

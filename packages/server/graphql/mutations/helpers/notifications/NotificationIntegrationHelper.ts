@@ -1,5 +1,8 @@
 import Meeting from '../../../../database/types/Meeting'
+import ReflectionGroup from '../../../../database/types/ReflectionGroup'
+import Reflection from '../../../../database/types/Reflection'
 import {Team} from '../../../../postgres/queries/getTeamsByIds'
+import IUser from '../../../../postgres/types/IUser'
 
 export type NotifyResponse =
   | 'success'
@@ -14,7 +17,7 @@ export type NotificationIntegration = {
   endMeeting(meeting: Meeting, team: Team): Promise<NotifyResponse>
   startTimeLimit(scheduledEndTime: Date, meeting: Meeting, team: Team): Promise<NotifyResponse>
   endTimeLimit(meeting: Meeting, team: Team): Promise<NotifyResponse>
-  shareTopic(teamId: string): Promise<NotifyResponse>
+  shareTopic(user: IUser, meeting: Meeting, team: Team, reflectionGroup: ReflectionGroup, reflections: Reflection[]): Promise<NotifyResponse>
   integrationUpdated(): Promise<NotifyResponse>
 }
 

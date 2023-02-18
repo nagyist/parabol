@@ -1,3 +1,5 @@
+import styled from '@emotion/styled'
+import {IosShare} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
 import useEmailItemGrid from 'parabol-client/hooks/useEmailItemGrid'
 import {PALETTE} from 'parabol-client/styles/paletteV3'
@@ -174,18 +176,22 @@ const RetroTopic = (props: Props) => {
         </td>
       </tr>
       {!isDemo && (
-        <tr>
-          <td>
-            <AnchorIfEmail href={to} isEmail={isEmail} style={commentLinkStyle}>
-              {commentLinkLabel}
-            </AnchorIfEmail>
-          </td>
-          <td>
-            <a onClick={onClick} style={commentLinkStyle} title='Share this topic'>
-            {`Share this topic`}
-            </a>
-          </td>
-        </tr>
+        <>
+          <tr>
+            <td align='center'>
+              <AnchorIfEmail href={to} isEmail={isEmail} style={commentLinkStyle}>
+                {commentLinkLabel}
+              </AnchorIfEmail>
+            </td>
+          </tr>
+          <tr>
+            <td align='center'>
+              <a onClick={onClick} style={commentLinkStyle} title='Share this topic'>
+                {`Share this topic`}
+              </a>
+            </td>
+          </tr>
+        </>
       )}
       <tr>
         <td>

@@ -232,13 +232,14 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
     return 'success'
   },
 
-  async shareTopic(teamId: string) {
+  async shareTopic(user, meeting, team, reflectionGroup, reflections) {
+    const reflectionsText = reflections.map((reflection) => `- ${reflection.plaintextContent}`).join('\n')
     const slackBlocks = [
       {
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "From [Name]: \n*[Message]*"
+          "text": `From ${user.preferredName}: \n*[Custom message from user]*`
         }
       },
       {
@@ -246,15 +247,15 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
         "fields": [
           {
             "type": "mrkdwn",
-            "text": "*Team:*\n[Team]"
+            "text": `*Team:*\n${team.name}`
           },
           {
             "type": "mrkdwn",
-            "text": "*Meeting:*\n[Meeting]"
+            "text": `*Meeting:*\n${meeting.name}`
           },
           {
             "type": "mrkdwn",
-            "text": "*Summary:*\n[summary]"
+            "text": `*Summary:*\n${reflectionGroup.summary}`
           }
         ]
       },
@@ -262,11 +263,11 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*Reflection:* \n-Reflection\n-Reflection\n-Reflection"
+          "text": `*Reflection:* \n${reflectionsText}`
         }
       }
     ]
-    const result =  await notifySlack(notificationChannel, 'TOPIC_SHARED', teamId, slackBlocks, 'here should be a title')
+    const result =  await notifySlack(notificationChannel, 'TOPIC_SHARED', team.id, slackBlocks, 'here should be a title')
     return result
   }
 })
@@ -331,9 +332,17 @@ export const SlackNotifier: Notifier = {
     // Slack sends a system message on its own
   },
 
-  async shareTopic(dataLoader: DataLoaderWorker, teamId: string) {
+  async shareTopic(dataLoader: DataLoaderWorker, userId: string, teamId: string, meetingId: string, reflectionGroupId: string) {
+    const r = await getRethink()
+    const [user, team, meeting, reflectionGroup, reflections] = await Promise.all([
+      dataLoader.get('users').load(userId),
+      dataLoader.get('teams').load(teamId),
+      dataLoader.get('newMeetings').load(meetingId),
+      dataLoader.get('retroReflectionGroups').load(reflectionGroupId),
+      r.table('RetroReflection').getAll(reflectionGroupId, {index: 'reflectionGroupId'}).run()
+    ])
+    console.log(`teamId = ${teamId}`)
     const notifiers = await getSlack(dataLoader, 'TOPIC_SHARED', teamId)
-    console.log(notifiers)
-    notifiers.forEach((notifier) => notifier.shareTopic(teamId))
+    notifiers.forEach((notifier) => notifier.shareTopic(user!, meeting, team!, reflectionGroup, reflections))
   }
 }
