@@ -1,5 +1,3 @@
-import styled from '@emotion/styled'
-import {IosShare} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
 import useEmailItemGrid from 'parabol-client/hooks/useEmailItemGrid'
 import {PALETTE} from 'parabol-client/styles/paletteV3'
@@ -49,6 +47,11 @@ const someCommentsLinkStyle = {
   fontSize: 13,
   fontWeight: 600,
   textDecoration: 'none'
+}
+
+const shareTopicStyle = {
+  ...someCommentsLinkStyle,
+  cursor: 'pointer'
 }
 
 const topicTitleStyle = {
@@ -186,7 +189,7 @@ const RetroTopic = (props: Props) => {
           </tr>
           <tr>
             <td align='center'>
-              <a onClick={onClick} style={commentLinkStyle} title='Share this topic'>
+              <a onClick={onClick} style={shareTopicStyle} title='Share this topic'>
                 {`Share this topic`}
               </a>
             </td>
