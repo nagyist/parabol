@@ -12,6 +12,7 @@ const TerserPlugin = require('terser-webpack-plugin')
 const {InjectManifest} = require('workbox-webpack-plugin')
 const CopyPlugin = require('copy-webpack-plugin')
 const getProjectRoot = require('./utils/getProjectRoot')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
 const PROJECT_ROOT = getProjectRoot()
 const CLIENT_ROOT = path.join(PROJECT_ROOT, 'packages', 'client')
@@ -87,6 +88,10 @@ module.exports = ({isDeploy, isStats}) => ({
     ]
   },
   plugins: [
+    new MiniCssExtractPlugin({
+      filename: '[name].css',
+      chunkFilename: '[id].css'
+    }),
     new CopyPlugin({
       patterns: [
         {
@@ -213,7 +218,7 @@ module.exports = ({isDeploy, isStats}) => ({
       {test: /\.flow$/, loader: 'ignore-loader'},
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader', 'postcss-loader']
+        use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader']
       },
       {
         test: /\.(png|jpg|jpeg|gif|svg)$/,
