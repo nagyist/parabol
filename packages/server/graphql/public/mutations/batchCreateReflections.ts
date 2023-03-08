@@ -71,9 +71,6 @@ const batchCreateReflections: MutationResolvers['batchCreateReflections'] = asyn
   })
   await Promise.all(unresolvedPromises)
 
-  console.log(`There are ${reflectionsAdded.length} reflectionsAdded`)
-  console.log(`There are ${reflectonGroupsAdded.length} reflectonGroupsAdded`)
-
   await r({
     group: r.table('RetroReflectionGroup').insert(reflectonGroupsAdded),
     reflection: r.table('RetroReflection').insert(reflectionsAdded)

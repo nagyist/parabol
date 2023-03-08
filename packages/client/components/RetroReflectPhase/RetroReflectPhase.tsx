@@ -65,7 +65,7 @@ const RetroReflectPhase = (props: Props) => {
                     content: `{"blocks":[{"key":"${(Math.random() + 1)
                       .toString(36)
                       .substring(4)}","text":"${
-                      row[promptId]
+                      row[promptId].trim()
                     }","type":"unstyled","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}`,
                     meetingId,
                     promptId,
@@ -73,7 +73,6 @@ const RetroReflectPhase = (props: Props) => {
                   })
               )
             ).flat()
-            console.log(reflections)
             submitMutation()
             BatchCreateReflectionsMutation(atmosphere, {reflections}, {onError, onCompleted})
 
