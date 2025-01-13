@@ -1,17 +1,16 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
+import {ReactjiCount_reactji$key} from '~/__generated__/ReactjiCount_reactji.graphql'
 import PlainButton from '~/components/PlainButton/PlainButton'
 import {TransitionStatus} from '~/hooks/useTransition'
 import {PALETTE} from '~/styles/paletteV3'
 import {BezierCurve, Times} from '~/types/constEnums'
-import {ReactjiCount_reactji$key} from '~/__generated__/ReactjiCount_reactji.graphql'
 import {MenuPosition} from '../../hooks/useCoords'
 import useTooltip from '../../hooks/useTooltip'
 import ReactjiId from '../../shared/gqlIds/ReactjiId'
-import EmojiUsersReaction from './EmojiUsersReaction'
 import getReactji from '../../utils/getReactji'
+import EmojiUsersReaction from './EmojiUsersReaction'
 
 const Parent = styled('div')<{status: TransitionStatus}>(({status}) => ({
   height: status === TransitionStatus.MOUNTED || status === TransitionStatus.EXITING ? 0 : 24,
@@ -80,7 +79,7 @@ const ReactjiCount = (props: Props) => {
   const reactjiObj = ReactjiId.split(id)
   const name = reactjiObj.name
 
-  const {unicode, shortName} = getReactji(name)
+  const {native, reactjiName} = getReactji(name)
   const onClick = () => {
     onToggle(name)
   }
@@ -94,9 +93,9 @@ const ReactjiCount = (props: Props) => {
         onMouseLeave={closeTooltip}
         ref={originRef}
       >
-        <Emoji>{unicode}</Emoji>
+        <Emoji>{native}</Emoji>
         <Count>{count}</Count>
-        {tooltipPortal(<EmojiUsersReaction reactjiRef={reactji} reactjiShortName={shortName} />)}
+        {tooltipPortal(<EmojiUsersReaction reactjiRef={reactji} reactjiName={reactjiName} />)}
       </Inner>
     </Parent>
   )

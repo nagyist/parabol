@@ -6,16 +6,17 @@ import {
   useElements,
   useStripe
 } from '@stripe/react-stripe-js'
-import React, {useState} from 'react'
+import {StripeElementChangeEvent} from '@stripe/stripe-js'
+import * as React from 'react'
+import {useState} from 'react'
+import {UpdateCreditCardMutation$data} from '../../../../__generated__/UpdateCreditCardMutation.graphql'
 import PrimaryButton from '../../../../components/PrimaryButton'
 import SecondaryButton from '../../../../components/SecondaryButton'
-import {PALETTE} from '../../../../styles/paletteV3'
-import UpdateCreditCardMutation from '../../../../mutations/UpdateCreditCardMutation'
+import StyledError from '../../../../components/StyledError'
 import useAtmosphere from '../../../../hooks/useAtmosphere'
 import useMutationProps from '../../../../hooks/useMutationProps'
-import StyledError from '../../../../components/StyledError'
-import {UpdateCreditCardMutation$data} from '../../../../__generated__/UpdateCreditCardMutation.graphql'
-import {StripeElementChangeEvent} from '@stripe/stripe-js'
+import UpdateCreditCardMutation from '../../../../mutations/UpdateCreditCardMutation'
+import {PALETTE} from '../../../../styles/paletteV3'
 
 const UpgradeButton = styled(PrimaryButton)<{disabled: boolean}>(({disabled}) => ({
   background: disabled ? PALETTE.SLATE_200 : PALETTE.SKY_500,

@@ -3,30 +3,29 @@ import formatWeekday from 'parabol-client/utils/date/formatWeekday'
 import makeAppURL from 'parabol-client/utils/makeAppURL'
 import findStageById from 'parabol-client/utils/meetings/findStageById'
 import {phaseLabelLookup} from 'parabol-client/utils/meetings/lookups'
+import TeamPromptResponseId from '../../../../../client/shared/gqlIds/TeamPromptResponseId'
+import {ErrorResponse, PostMessageResponse} from '../../../../../client/utils/SlackManager'
 import appOrigin from '../../../../appOrigin'
-import getRethink from '../../../../database/rethinkDriver'
-import Meeting from '../../../../database/types/Meeting'
-import {SlackNotificationEvent} from '../../../../database/types/SlackNotification'
+import SlackAuth from '../../../../database/types/SlackAuth'
 import {SlackNotificationAuth} from '../../../../dataloader/integrationAuthLoaders'
-import {Team} from '../../../../postgres/queries/getTeamsByIds'
-import {MeetingTypeEnum} from '../../../../postgres/types/Meeting'
+import getKysely from '../../../../postgres/getKysely'
+import {getTeamPromptResponsesByMeetingId} from '../../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
+import {SlackNotification, Team, TeamPromptResponse} from '../../../../postgres/types'
+import User from '../../../../postgres/types/IUser'
+import {AnyMeeting, MeetingTypeEnum} from '../../../../postgres/types/Meeting'
+import {AnyNotification} from '../../../../postgres/types/Notification'
+import SlackServerManager from '../../../../utils/SlackServerManager'
+import {analytics} from '../../../../utils/analytics/analytics'
 import {toEpochSeconds} from '../../../../utils/epochTime'
 import sendToSentry from '../../../../utils/sendToSentry'
-import SlackServerManager from '../../../../utils/SlackServerManager'
+import {convertToMarkdown} from '../../../../utils/tiptap/convertToMarkdown'
 import {DataLoaderWorker} from '../../../graphql'
+import {NotificationIntegrationHelper} from './NotificationIntegrationHelper'
+import {createNotifier} from './Notifier'
 import getSummaryText from './getSummaryText'
 import {makeButtons, makeHeader, makeSection, makeSections} from './makeSlackBlocks'
-import {NotificationIntegrationHelper} from './NotificationIntegrationHelper'
-import {Notifier} from './Notifier'
-import SlackAuth from '../../../../database/types/SlackAuth'
-import {getTeamPromptResponsesByMeetingId} from '../../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
-import {ErrorResponse, PostMessageResponse} from '../../../../../client/utils/SlackManager'
-import {TeamPromptResponse} from '../../../../postgres/queries/getTeamPromptResponsesByIds'
-import User from '../../../../postgres/types/IUser'
-import {convertToMarkdown} from '../../../../utils/tiptap/convertToMarkdown'
-import {analytics} from '../../../../utils/analytics/analytics'
 
-type SlackNotification = {
+type SlackNotificationMessage = {
   title: string
   blocks: string | Array<{type: string}>
 }
@@ -45,15 +44,12 @@ const handleError = async (
   if ('error' in res) {
     const {error} = res
     if (error === 'channel_not_found') {
-      const r = await getRethink()
-      await r
-        .table('SlackNotification')
-        .getAll(teamId, {index: 'teamId'})
-        .filter({channelId})
-        .update({
-          channelId: null
-        })
-        .run()
+      await getKysely()
+        .updateTable('SlackNotification')
+        .set({channelId: null})
+        .where('teamId', '=', teamId)
+        .where('channelId', '=', channelId)
+        .execute()
       return {
         error: new Error('channel_not_found')
       }
@@ -77,23 +73,24 @@ const handleError = async (
 
 const notifySlack = async (
   notificationChannel: NotificationChannel,
-  event: SlackNotificationEvent,
+  event: SlackNotification['event'],
   teamId: string,
+  user: User,
   slackMessage: string | Array<{type: string}>,
   notificationText?: string,
   ts?: string,
   reflectionGroupId?: string
 ): Promise<PostMessageResponse | ErrorResponse> => {
   const {channelId, auth} = notificationChannel
-  const {botAccessToken, userId} = auth
+  const {botAccessToken} = auth
   const manager = new SlackServerManager(botAccessToken!)
   const res = await manager.postMessage(channelId!, slackMessage, notificationText, ts)
-  analytics.slackNotificationSent(userId, teamId, event, reflectionGroupId)
+  analytics.slackNotificationSent(user, teamId, event, reflectionGroupId)
 
   return res
 }
 
-const makeEndMeetingButtons = (meeting: Meeting) => {
+const makeEndMeetingButtons = (meeting: AnyMeeting) => {
   const {id: meetingId} = meeting
   const searchParams = {
     utm_source: 'slack summary',
@@ -138,13 +135,13 @@ const makeEndMeetingButtons = (meeting: Meeting) => {
 
 const createTeamSectionContent = (team: Team) => `*Team:*\n${team.name}`
 
-const createMeetingSectionContent = (meeting: Meeting) => `*Meeting:*\n${meeting.name}`
+const createMeetingSectionContent = (meeting: AnyMeeting) => `*Meeting:*\n${meeting.name}`
 
 const makeTeamPromptStartMeetingNotification = (
   team: Team,
-  meeting: Meeting,
+  meeting: AnyMeeting,
   meetingUrl: string
-): SlackNotification => {
+): SlackNotificationMessage => {
   const title = `*${meeting.name}* is open :speech_balloon: `
   const blocks = [
     makeSection(title),
@@ -157,9 +154,9 @@ const makeTeamPromptStartMeetingNotification = (
 
 const makeGenericStartMeetingNotification = (
   team: Team,
-  meeting: Meeting,
+  meeting: AnyMeeting,
   meetingUrl: string
-): SlackNotification => {
+): SlackNotificationMessage => {
   const title = 'Meeting started :wave: '
   const blocks = [
     makeSection(title),
@@ -172,7 +169,7 @@ const makeGenericStartMeetingNotification = (
 
 const makeStartMeetingNotificationLookup: Record<
   MeetingTypeEnum,
-  (team: Team, meeting: Meeting, meetingUrl: string) => SlackNotification
+  (team: Team, meeting: AnyMeeting, meetingUrl: string) => SlackNotificationMessage
 > = {
   teamPrompt: makeTeamPromptStartMeetingNotification,
   action: makeGenericStartMeetingNotification,
@@ -184,7 +181,8 @@ const addStandupResponsesToThread = async (
   res: PostMessageResponse,
   standupResponses: Array<{user: User; response: TeamPromptResponse}> | null,
   team: Team,
-  meeting: Meeting,
+  user: User,
+  meeting: AnyMeeting,
   notificationChannel: NotificationChannel
 ) => {
   if (!standupResponses || standupResponses.length === 0) {
@@ -193,6 +191,7 @@ const addStandupResponsesToThread = async (
       notificationChannel,
       'meetingEnd',
       team.id,
+      user,
       message,
       message,
       res.ts
@@ -210,7 +209,7 @@ const addStandupResponsesToThread = async (
           utm_source: 'slack standup summary',
           utm_medium: 'product',
           utm_campaign: 'after-meeting',
-          responseId: response.id
+          responseId: TeamPromptResponseId.join(response.id)
         }
       }
       const responseUrl = makeAppURL(appOrigin, `meet/${meeting.id}/responses`, options)
@@ -224,6 +223,7 @@ const addStandupResponsesToThread = async (
         notificationChannel,
         'meetingEnd',
         team.id,
+        user,
         threadBlocks,
         undefined,
         res.ts
@@ -243,10 +243,106 @@ const addStandupResponsesToThread = async (
   return 'success'
 }
 
+const getSlackMessageForNotification = async (
+  dataLoader: DataLoaderWorker,
+  notification: AnyNotification,
+  meeting: AnyMeeting,
+  userId: string
+) => {
+  if (notification.type === 'RESPONSE_REPLIED') {
+    const responses = await getTeamPromptResponsesByMeetingId(notification.meetingId)
+    const responseId = responses.find(({userId: responseUserId}) => responseUserId === userId)?.id
+    if (!responseId) {
+      return null
+    }
+    const author = await dataLoader.get('users').loadNonNull(notification.authorId)
+    const comment = await dataLoader.get('comments').loadNonNull(notification.commentId)
+
+    const authorName = comment.isAnonymous ? 'Anonymous' : author.preferredName
+
+    const options = {
+      searchParams: {
+        utm_source: 'slack standup notification',
+        utm_medium: 'product',
+        utm_campaign: 'notifications',
+        responseId: TeamPromptResponseId.join(responseId)
+      }
+    }
+
+    const buttonUrl = makeAppURL(appOrigin, `meet/${notification.meetingId}/responses`, options)
+    return {
+      buttonUrl,
+      title: `*${authorName}* replied to your response in *${meeting.name}*`,
+      body: `> ${comment.plaintextContent}`,
+      buttonText: 'See the discussion'
+    }
+  } else if (notification.type === 'RESPONSE_MENTIONED') {
+    const responseId = notification.responseId
+    const response = await dataLoader.get('teamPromptResponses').loadNonNull(responseId)
+    const author = await dataLoader.get('users').loadNonNull(response.userId)
+    const title = `*${author.preferredName}* mentioned you in their response in *${meeting.name}*`
+
+    const options = {
+      searchParams: {
+        utm_source: 'slack standup notification',
+        utm_medium: 'product',
+        utm_campaign: 'notifications',
+        responseId: TeamPromptResponseId.join(notification.responseId)
+      }
+    }
+
+    const buttonUrl = makeAppURL(appOrigin, `meet/${notification.meetingId}/responses`, options)
+
+    return {
+      buttonUrl,
+      title,
+      buttonText: 'See their response'
+    }
+  } else if (notification.type === 'MENTIONED') {
+    // This type is no longer created anywhere in the app but is still in the DB.
+    // We should remove this logic & the remaining DB notifications
+    const authorName = notification.senderName ?? 'Someone'
+    const {meetingId} = notification
+
+    let location = 'message'
+    let buttonText = 'See their message'
+    const searchParams = {
+      utm_source: 'slack mention notification',
+      utm_medium: 'product',
+      utm_campaign: 'notifications'
+    }
+    let buttonUrl = makeAppURL(appOrigin, `meet/${meetingId}`, {
+      searchParams
+    })
+
+    if (notification.retroDiscussStageIdx) {
+      buttonText = 'See their reflection'
+      location = 'reflection'
+      buttonUrl = makeAppURL(
+        appOrigin,
+        `meet/${meetingId}/discuss/${notification.retroDiscussStageIdx}`,
+        {
+          searchParams
+        }
+      )
+    }
+
+    const title = `*${authorName}* mentioned you in their ${location} in *${meeting.name}*`
+
+    return {
+      buttonUrl,
+      title,
+      buttonText
+    }
+  }
+
+  return null
+}
+
 export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNotificationAuth> = (
   notificationChannel
 ) => ({
-  async startMeeting(meeting, team) {
+  async startMeeting(meeting, team, user) {
     const searchParams = {
       utm_source: 'slack meeting start',
       utm_medium: 'product',
@@ -254,19 +350,22 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
     }
     const options = {searchParams}
     const meetingUrl = makeAppURL(appOrigin, `meet/${meeting.id}`, options)
-    const {title, blocks} = makeStartMeetingNotificationLookup[meeting.meetingType](
+    const {title, blocks} = makeStartMeetingNotificationLookup[meeting.meetingType]!(
       team,
       meeting,
       meetingUrl
     )
 
-    const res = await notifySlack(notificationChannel, 'meetingStart', team.id, blocks, title)
+    const res = await notifySlack(notificationChannel, 'meetingStart', team.id, user, blocks, title)
     if ('error' in res) {
       return handleError(res, team.id, notificationChannel)
     }
     if ('ts' in res) {
-      const r = await getRethink()
-      await r.table('NewMeeting').get(meeting.id).update({slackTs: res.ts}).run()
+      await getKysely()
+        .updateTable('NewMeeting')
+        .set({slackTs: Number(res.ts)})
+        .where('id', '=', meeting.id)
+        .execute()
     }
     return 'success'
   },
@@ -290,26 +389,29 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
     }
     const options = {searchParams}
     const meetingUrl = makeAppURL(appOrigin, `meet/${meeting.id}`, options)
-    const {blocks} = makeStartMeetingNotificationLookup[meeting.meetingType](
+    const {blocks} = makeStartMeetingNotificationLookup[meeting.meetingType]!(
       team,
       meeting,
       meetingUrl
     )
 
     const manager = new SlackServerManager(botAccessToken)
-    const res = await manager.updateMessage(channelId, blocks, slackTs)
+    const res = await manager.updateMessage(channelId, blocks, String(slackTs))
 
     if ('error' in res) {
       return handleError(res, team.id, notificationChannel)
     }
     if ('ts' in res) {
-      const r = await getRethink()
-      await r.table('NewMeeting').get(meeting.id).update({slackTs: res.ts}).run()
+      await getKysely()
+        .updateTable('NewMeeting')
+        .set({slackTs: Number(res.ts)})
+        .where('id', '=', meeting.id)
+        .execute()
     }
     return 'success'
   },
 
-  async endMeeting(meeting, team, standupResponses) {
+  async endMeeting(meeting, team, user, standupResponses) {
     const summaryText = await getSummaryText(meeting)
     const title = 'Meeting completed :tada:'
     const blocks: Array<{type: string}> = [
@@ -322,7 +424,7 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
       blocks.push(makeSection(`*${aiSummaryTitle}*:\n${meeting.summary}`))
     }
     blocks.push(makeEndMeetingButtons(meeting))
-    const res = await notifySlack(notificationChannel, 'meetingEnd', team.id, blocks, title)
+    const res = await notifySlack(notificationChannel, 'meetingEnd', team.id, user, blocks, title)
     if ('error' in res) {
       return handleError(res, team.id, notificationChannel)
     }
@@ -330,10 +432,17 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
       return 'success'
     }
 
-    return addStandupResponsesToThread(res, standupResponses, team, meeting, notificationChannel)
+    return addStandupResponsesToThread(
+      res,
+      standupResponses,
+      team,
+      user,
+      meeting,
+      notificationChannel
+    )
   },
 
-  async startTimeLimit(scheduledEndTime, meeting, team) {
+  async startTimeLimit(scheduledEndTime, meeting, team, user) {
     const {phases, facilitatorStageId} = meeting
     const stageRes = findStageById(phases, facilitatorStageId)
     const {stage} = stageRes!
@@ -360,6 +469,7 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
       notificationChannel,
       'MEETING_STAGE_TIME_LIMIT_START',
       team.id,
+      user,
       blocks,
       title
     )
@@ -369,15 +479,23 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
     return 'success'
   },
 
-  async endTimeLimit(meeting, team) {
+  async endTimeLimit(meeting, team, user) {
     const meetingUrl = makeAppURL(appOrigin, `meet/${meeting.id}`)
-    // TODO now is a good time to make the message nice with the `meetingName`
-    const slackText = `Time’s up! Advance your meeting to the next phase: ${meetingUrl}`
+    const title = `Time’s up! Advance your meeting to the next phase :alarm_clock:`
+    const button = {text: 'Open meeting', url: meetingUrl, type: 'primary'} as const
+    const blocks = [
+      makeSection(title),
+      makeSections([createTeamSectionContent(team), createMeetingSectionContent(meeting)]),
+      makeButtons([button])
+    ]
+
     const res = await notifySlack(
       notificationChannel,
       'MEETING_STAGE_TIME_LIMIT_END',
       team.id,
-      slackText
+      user,
+      blocks,
+      title
     )
 
     if ('error' in res) {
@@ -397,7 +515,7 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
         utm_source: 'slack standup submission',
         utm_medium: 'product',
         utm_campaign: 'notifications',
-        responseId: response.id
+        responseId: TeamPromptResponseId.join(response.id)
       }
     }
     const responseUrl = makeAppURL(appOrigin, `meet/${meeting.id}/responses`, options)
@@ -410,6 +528,7 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
       notificationChannel,
       'STANDUP_RESPONSE_SUBMITTED',
       team.id,
+      user,
       blocks,
       title
     )
@@ -422,8 +541,9 @@ export const SlackSingleChannelNotifier: NotificationIntegrationHelper<SlackNoti
 
 async function getSlack(
   dataLoader: DataLoaderWorker,
-  event: SlackNotificationEvent,
-  teamId: string
+  teamId: string,
+  _userId: string,
+  event: SlackNotification['event']
 ) {
   const notifications = await dataLoader
     .get('slackNotificationsByTeamIdAndEvent')
@@ -431,95 +551,42 @@ async function getSlack(
   return notifications.map(SlackSingleChannelNotifier)
 }
 
-async function loadMeetingTeam(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-  const [team, meeting] = await Promise.all([
-    dataLoader.get('teams').load(teamId),
-    dataLoader.get('newMeetings').load(meetingId)
-  ])
-  return {
-    meeting,
-    team
+const getDmSlackForMeeting = async (
+  dataLoader: DataLoaderWorker,
+  meeting: AnyMeeting,
+  userId: string
+) => {
+  // Order of slack auth is:
+  // 1. Auth on team
+  // 2. Auth in org (auth team is in same org as meeting team)
+  // 3. Any auth for user
+  const userSlackAuths = (await dataLoader.get('slackAuthByUserId').load(userId)).filter(
+    (auth) => !!auth.botAccessToken
+  )
+
+  // If the user has an integration on the meeting's team, just use that.
+  const teamAuth = userSlackAuths.find((auth) => auth.teamId === meeting.teamId)
+  if (teamAuth) {
+    return teamAuth
   }
+
+  // If the user has an integration on a team in the meeting's org, use that.
+  const meetingTeamOrgId = (await dataLoader.get('teams').loadNonNull(meeting.teamId)).orgId
+  const teamIdsInOrg = (await dataLoader.get('teamsByOrgIds').load(meetingTeamOrgId)).map(
+    (team) => team.id
+  )
+  const orgAuth = userSlackAuths.find((auth) => teamIdsInOrg.includes(auth.teamId))
+  if (orgAuth) {
+    return orgAuth
+  }
+
+  // If the user does not have an integration within the meeting's org, use any integration outside
+  // the org
+  return userSlackAuths[0]
 }
 
-export const SlackNotifier: Notifier = {
-  async startMeeting(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    const notifiers = await getSlack(dataLoader, 'meetingStart', team.id)
-    notifiers.forEach((notifier) => notifier.startMeeting(meeting, team))
-  },
-
-  async updateMeeting(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    const notifiers = await getSlack(dataLoader, 'meetingStart', team.id)
-    notifiers.forEach((notifier) => notifier.updateMeeting?.(meeting, team))
-  },
-
-  async endMeeting(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    const meetingResponses = await getTeamPromptResponsesByMeetingId(meetingId)
-    // const standupResponses: Array<{user: User; response: TeamPromptResponse}> = []
-    const standupResponses = await Promise.all(
-      meetingResponses.map(async (response) => {
-        const user = await dataLoader.get('users').loadNonNull(response.userId)
-        return {
-          user,
-          response
-        }
-      })
-    )
-    if (!meeting || !team) return
-    const notifiers = await getSlack(dataLoader, 'meetingEnd', team.id)
-    notifiers.forEach((notifier) => notifier.endMeeting(meeting, team, standupResponses))
-  },
-
-  async startTimeLimit(
-    dataLoader: DataLoaderWorker,
-    scheduledEndTime: Date,
-    meetingId: string,
-    teamId: string
-  ) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    const notifiers = await getSlack(dataLoader, 'MEETING_STAGE_TIME_LIMIT_START', team.id)
-    notifiers.forEach((notifier) => notifier.startTimeLimit(scheduledEndTime, meeting, team))
-  },
-
-  async endTimeLimit(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    const notifiers = await getSlack(dataLoader, 'MEETING_STAGE_TIME_LIMIT_END', team.id)
-    notifiers.forEach((notifier) => notifier.endTimeLimit(meeting, team))
-  },
-
-  async integrationUpdated() {
-    // Slack sends a system message on its own
-  },
-
-  async standupResponseSubmitted(
-    dataLoader: DataLoaderWorker,
-    meetingId: string,
-    teamId: string,
-    userId: string
-  ) {
-    const [{meeting, team}, user, responses] = await Promise.all([
-      loadMeetingTeam(dataLoader, meetingId, teamId),
-      dataLoader.get('users').load(userId),
-      getTeamPromptResponsesByMeetingId(meetingId)
-    ])
-    const response = responses.find(({userId: responseUserId}) => responseUserId === userId)
-    if (!meeting || !team || !response || !user) {
-      return
-    }
-
-    const notifiers = await getSlack(dataLoader, 'STANDUP_RESPONSE_SUBMITTED', team.id)
-    notifiers.forEach((notifier) =>
-      notifier.standupResponseSubmitted(meeting, team, user, response)
-    )
-  },
-
+export const SlackNotifier = {
+  ...createNotifier(getSlack),
   async shareTopic(
     dataLoader: DataLoaderWorker,
     userId: string,
@@ -529,21 +596,15 @@ export const SlackNotifier: Notifier = {
     stageIndex: number,
     channelId: string
   ) {
-    const r = await getRethink()
-    const [team, meeting, reflectionGroup, reflections, slackAuth] = await Promise.all([
+    const [team, user, meeting, reflectionGroup, reflections, userSlackAuths] = await Promise.all([
       dataLoader.get('teams').loadNonNull(teamId),
-      dataLoader.get('newMeetings').load(meetingId),
-      dataLoader.get('retroReflectionGroups').load(reflectionGroupId),
-      r.table('RetroReflection').getAll(reflectionGroupId, {index: 'reflectionGroupId'}).run(),
-      r
-        .table('SlackAuth')
-        .getAll(userId, {index: 'userId'})
-        .filter({teamId})
-        .nth(0)
-        .default(null)
-        .run()
+      dataLoader.get('users').loadNonNull(userId),
+      dataLoader.get('newMeetings').loadNonNull(meetingId),
+      dataLoader.get('retroReflectionGroups').loadNonNull(reflectionGroupId),
+      dataLoader.get('retroReflectionsByGroupId').load(reflectionGroupId),
+      dataLoader.get('slackAuthByUserId').load(userId)
     ])
-
+    const slackAuth = userSlackAuths.find((auth) => auth.teamId === teamId)
     if (!slackAuth) {
       throw new Error('Slack auth not found')
     }
@@ -594,10 +655,6 @@ export const SlackNotifier: Notifier = {
       makeSection(`*Topic:*\n<${discussionUrl}|${topic}>`)
     ]
 
-    if (reflectionGroup.summary) {
-      slackBlocks.push(makeSection(`*Summary:*\n${reflectionGroup.summary}`))
-    }
-
     slackBlocks.push(makeSection(`*Reflections:* \n${reflectionsText}`))
 
     const notificationChannel = {
@@ -609,6 +666,7 @@ export const SlackNotifier: Notifier = {
       notificationChannel,
       'TOPIC_SHARED',
       team.id,
+      user,
       slackBlocks,
       undefined,
       undefined,
@@ -618,5 +676,53 @@ export const SlackNotifier: Notifier = {
       return handleError(res, team.id, notificationChannel)
     }
     return 'success'
+  },
+
+  async sendNotificationToUser(
+    dataLoader: DataLoaderWorker,
+    notificationId: string,
+    userId: string
+  ) {
+    const notification = await dataLoader.get('notifications').loadNonNull(notificationId)
+    if (
+      notification.type !== 'RESPONSE_MENTIONED' &&
+      notification.type !== 'RESPONSE_REPLIED' &&
+      notification.type !== 'MENTIONED'
+    ) {
+      return
+    }
+
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(notification.meetingId)
+
+    const userSlackAuth = await getDmSlackForMeeting(dataLoader, meeting, userId)
+    if (!userSlackAuth) {
+      return
+    }
+
+    const slackMessageFields = await getSlackMessageForNotification(
+      dataLoader,
+      notification,
+      meeting,
+      userId
+    )
+    if (!slackMessageFields) {
+      return
+    }
+
+    const {buttonUrl, title, buttonText, body} = slackMessageFields
+
+    if (!buttonUrl) {
+      return
+    }
+
+    const blocks: Array<{type: string}> = [
+      makeSection(title),
+      ...(body ? [makeSection(body)] : []),
+      makeButtons([{text: buttonText, url: buttonUrl, type: 'primary'}])
+    ]
+
+    const {botAccessToken} = userSlackAuth
+    const manager = new SlackServerManager(botAccessToken!)
+    manager.postMessage(userSlackAuth.slackUserId, blocks, title)
   }
 }

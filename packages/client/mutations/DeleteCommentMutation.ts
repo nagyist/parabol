@@ -1,12 +1,12 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {RecordProxy, RecordSourceSelectorProxy} from 'relay-runtime'
-import convertToTaskContent from '~/utils/draftjs/convertToTaskContent'
+import {DeleteCommentMutation_meeting$data} from '~/__generated__/DeleteCommentMutation_meeting.graphql'
 import safeRemoveNodeFromArray from '~/utils/relay/safeRemoveNodeFromArray'
 import safeRemoveNodeFromConn from '~/utils/relay/safeRemoveNodeFromConn'
-import {DeleteCommentMutation_meeting$data} from '~/__generated__/DeleteCommentMutation_meeting.graphql'
-import {SharedUpdater, SimpleMutation} from '../types/relayMutations'
 import {DeleteCommentMutation as TDeleteCommentMutation} from '../__generated__/DeleteCommentMutation.graphql'
+import {convertTipTapTaskContent} from '../shared/tiptap/convertTipTapTaskContent'
+import {SharedUpdater, SimpleMutation} from '../types/relayMutations'
 import getDiscussionThreadConn from './connections/getDiscussionThreadConn'
 
 graphql`
@@ -62,7 +62,7 @@ const handleDeleteComment = (
     return
   }
   if (replies && replies.length > 0) {
-    const TOMBSTONE = convertToTaskContent('[deleted]')
+    const TOMBSTONE = convertTipTapTaskContent('[deleted]')
     comment.setValue(TOMBSTONE, 'content')
     comment.setValue(false, 'isActive')
   } else {

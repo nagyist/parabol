@@ -1,9 +1,8 @@
 import base64url from 'base64url'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import {Security} from 'parabol-client/types/constEnums'
-import getRethink from '../database/rethinkDriver'
-import EmailVerification from '../database/types/EmailVerification'
+import {Security, Threshold} from 'parabol-client/types/constEnums'
+import getKysely from '../postgres/getKysely'
 import emailVerificationEmailCreator from './emailVerificationEmailCreator'
 import getMailManager from './getMailManager'
 
@@ -11,12 +10,12 @@ type SignUpWithPasswordMutationVariables = {
   email: string
   password: string
   invitationToken?: string | null
-  segmentId?: string | null
+  pseudoId?: string | null
   redirectTo?: string | null
 }
 
 const createEmailVerification = async (props: SignUpWithPasswordMutationVariables) => {
-  const {password, invitationToken, segmentId, redirectTo} = props
+  const {password, invitationToken, pseudoId, redirectTo} = props
   const email = props.email.toLowerCase().trim()
   const tokenBuffer = crypto.randomBytes(48)
   const verifiedEmailToken = base64url.encode(tokenBuffer)
@@ -35,16 +34,19 @@ const createEmailVerification = async (props: SignUpWithPasswordMutationVariable
   if (!success) {
     return {error: {message: 'Unable to send verification email'}}
   }
-  const r = await getRethink()
   const hashedPassword = await bcrypt.hash(password, Security.SALT_ROUNDS)
-  const emailVerification = new EmailVerification({
-    email,
-    token: verifiedEmailToken,
-    hashedPassword,
-    segmentId,
-    invitationToken
-  })
-  await r.table('EmailVerification').insert(emailVerification).run()
+  const pg = getKysely()
+  await pg
+    .insertInto('EmailVerification')
+    .values({
+      email,
+      token: verifiedEmailToken,
+      hashedPassword,
+      pseudoId,
+      invitationToken,
+      expiration: new Date(Date.now() + Threshold.EMAIL_VERIFICATION_LIFESPAN)
+    })
+    .execute()
   return {error: {message: 'Verification required. Check your inbox.'}}
 }
 

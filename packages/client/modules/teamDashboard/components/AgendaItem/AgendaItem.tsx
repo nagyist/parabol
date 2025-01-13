@@ -1,11 +1,13 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect, useRef, useState} from 'react'
+import * as React from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
 import {
-  AgendaItem_meeting$key,
-  AgendaItem_meeting$data
+  AgendaItem_meeting$data,
+  AgendaItem_meeting$key
 } from '~/__generated__/AgendaItem_meeting.graphql'
+import {AgendaItem_agendaItem$key} from '../../../../__generated__/AgendaItem_agendaItem.graphql'
 import Avatar from '../../../../components/Avatar/Avatar'
 import IconButton from '../../../../components/IconButton'
 import MeetingSubnavItem from '../../../../components/MeetingSubnavItem'
@@ -20,7 +22,6 @@ import pinIcon from '../../../../styles/theme/images/icons/pin.svg'
 import unpinIcon from '../../../../styles/theme/images/icons/unpin.svg'
 import {ICON_SIZE} from '../../../../styles/typographyV2'
 import findStageAfterId from '../../../../utils/meetings/findStageAfterId'
-import {AgendaItem_agendaItem$key} from '../../../../__generated__/AgendaItem_agendaItem.graphql'
 
 const AgendaItemStyles = styled('div')({
   position: 'relative',
@@ -63,7 +64,7 @@ const getItemProps = (
   agendaItemId: string,
   viewerId: string,
   gotoStageId: ReturnType<typeof useGotoStageId> | undefined,
-  meeting: AgendaItem_meeting$data | null
+  meeting: AgendaItem_meeting$data | null | undefined
 ) => {
   const fallback = {
     isDisabled: false,
@@ -106,7 +107,7 @@ interface Props {
   agendaItem: AgendaItem_agendaItem$key
   gotoStageId: ReturnType<typeof useGotoStageId> | undefined
   isDragging: boolean
-  meeting: AgendaItem_meeting$key | null
+  meeting: AgendaItem_meeting$key | null | undefined
 }
 
 const AgendaItem = (props: Props) => {
@@ -199,7 +200,7 @@ const AgendaItem = (props: Props) => {
 
   const getIcon = () => {
     if (pinned && isHovering) return <SvgIcon alt='unpinIcon' src={unpinIcon} />
-    else if (!pinned && !isHovering) return <Avatar hasBadge={false} picture={picture} size={24} />
+    else if (!pinned && !isHovering) return <Avatar picture={picture} className='h-6 w-6' />
     else return <SvgIcon alt='pinnedIcon' src={pinIcon} />
   }
 
@@ -238,7 +239,9 @@ const AgendaItem = (props: Props) => {
         />
       </AgendaItemStyles>
       {tooltipPortal(
-        pinned ? `Unpin "${content}" from every check-in` : `Pin "${content}" to every check-in`
+        pinned
+          ? `Unpin this agenda topic from every check-in`
+          : `Pin this agenda topic to every check-in`
       )}
     </>
   )

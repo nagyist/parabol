@@ -1,8 +1,8 @@
 import {MutableRefObject, useCallback, useEffect, useMemo, useRef} from 'react'
 import {commitLocalUpdate} from 'react-relay'
-import SendClientSegmentEventMutation from '~/mutations/SendClientSegmentEventMutation'
-import {Times} from '~/types/constEnums'
 import {GroupingKanban_meeting$data} from '~/__generated__/GroupingKanban_meeting.graphql'
+import {Times} from '~/types/constEnums'
+import SendClientSideEvent from '~/utils/SendClientSideEvent'
 import EndDraggingReflectionMutation from '../mutations/EndDraggingReflectionMutation'
 import useAtmosphere from './useAtmosphere'
 
@@ -53,7 +53,7 @@ const useSpotlightSimulatedDrag = (
       dropTargetId: null,
       dragId: dragIdRef.current
     })
-    SendClientSegmentEventMutation(atmosphere, 'Closed Spotlight', {
+    SendClientSideEvent(atmosphere, 'Closed Spotlight', {
       reflectionsCount,
       meetingId,
       reflectionId,

@@ -1,4 +1,5 @@
-import React, {Reducer, useCallback, useMemo, useReducer} from 'react'
+import * as React from 'react'
+import {Reducer, useCallback, useMemo, useReducer} from 'react'
 import Legitity from '../validation/Legitity'
 import useEventCallback from './useEventCallback'
 
@@ -94,9 +95,7 @@ const useForm = <T extends FieldInputDict>(fieldInputDict: T, deps: any[] = []) 
           }
           return obj
         }, {} as FieldState<T>),
-      [
-        /* eslint-disable-line react-hooks/exhaustive-deps */
-      ]
+      []
     )
   )
 

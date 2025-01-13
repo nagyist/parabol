@@ -3,8 +3,8 @@ import {useCallback} from 'react'
 import {readInlineData} from 'relay-runtime'
 import {NavigateMeetingMutation as TNavigateMeetingMutation} from '~/__generated__/NavigateMeetingMutation.graphql'
 import {useGotoStageId_meeting$key} from '~/__generated__/useGotoStageId_meeting.graphql'
-import {demoTeamId} from '../modules/demo/initDB'
 import LocalAtmosphere from '../modules/demo/LocalAtmosphere'
+import {demoTeamId} from '../modules/demo/initDB'
 import NavigateMeetingMutation from '../mutations/NavigateMeetingMutation'
 import findStageById from '../utils/meetings/findStageById'
 import isForwardProgress from '../utils/meetings/isForwardProgress'
@@ -31,6 +31,9 @@ const useGotoStageId = (meetingRef: useGotoStageId_meeting$key) => {
             isNavigableByFacilitator
           }
         }
+        localStage {
+          id
+        }
       }
     `,
     meetingRef
@@ -43,9 +46,11 @@ const useGotoStageId = (meetingRef: useGotoStageId_meeting$key) => {
         facilitatorStageId,
         facilitatorUserId,
         id: meetingId,
-        phases
+        phases,
+        localStage
       } = meeting
       const {viewerId} = atmosphere
+      if (localStage?.id === stageId) return
       const isViewerFacilitator = viewerId === facilitatorUserId
       const res = findStageById(phases, stageId)
       if (!res) return

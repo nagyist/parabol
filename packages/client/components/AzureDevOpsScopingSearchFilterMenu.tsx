@@ -1,13 +1,12 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
-import {MenuProps} from '../hooks/useMenu'
 import {
   AzureDevOpsScopingSearchFilterMenu_meeting$data,
   AzureDevOpsScopingSearchFilterMenu_meeting$key
 } from '../__generated__/AzureDevOpsScopingSearchFilterMenu_meeting.graphql'
+import {MenuProps} from '../hooks/useMenu'
 import Checkbox from './Checkbox'
 import DropdownMenuLabel from './DropdownMenuLabel'
 import Menu from './Menu'

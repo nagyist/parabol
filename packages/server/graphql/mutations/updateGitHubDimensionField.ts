@@ -1,7 +1,7 @@
 import {GraphQLID, GraphQLNonNull, GraphQLString} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import MeetingPoker from '../../database/types/MeetingPoker'
 import upsertGitHubDimensionFieldMap from '../../postgres/queries/upsertGitHubDimensionFieldMap'
+import {Logger} from '../../utils/Logger'
 import {isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import {GQLContext} from '../graphql'
@@ -48,7 +48,10 @@ const updateGitHubDimensionField = {
     if (!meeting) {
       return {error: {message: 'Invalid meetingId'}}
     }
-    const {teamId, templateRefId} = meeting as MeetingPoker
+    if (meeting.meetingType !== 'poker') {
+      return {error: {message: 'Not a poker meeting'}}
+    }
+    const {teamId, templateRefId} = meeting
     if (!isTeamMember(authToken, teamId)) {
       return {error: {message: 'Not on team'}}
     }
@@ -66,7 +69,7 @@ const updateGitHubDimensionField = {
     try {
       await upsertGitHubDimensionFieldMap(teamId, dimensionName, nameWithOwner, labelTemplate)
     } catch (e) {
-      console.log(e)
+      Logger.log(e)
     }
 
     const data = {meetingId, teamId}

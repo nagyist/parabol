@@ -1,11 +1,12 @@
 import getGoogleLanguageManager from '../../../getGoogleLanguageManager'
-import manageGoogleNLPErrorResponse from './manageGoogleNLPErrorResponse'
 import addLemmaToEntities from './autoGroup/addLemmaToEntities'
 import sanitizeAnalyzedEntitiesResponse from './autoGroup/sanitizeAnalyzedEntititesResponse'
+import manageGoogleNLPErrorResponse from './manageGoogleNLPErrorResponse'
 
 const getReflectionEntities = async (plaintextContent: string) => {
   if (!plaintextContent) return []
   const manager = getGoogleLanguageManager()
+  if (!manager) return []
   const res = await Promise.all([
     manager.analyzeEntities(plaintextContent),
     manager.analyzeSyntax(plaintextContent)

@@ -1,8 +1,9 @@
 import styled from '@emotion/styled-base'
 import {Edit} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
+import * as React from 'react'
 import {useFragment} from 'react-relay'
+import {GitHubFieldMenu_stage$key} from '../__generated__/GitHubFieldMenu_stage.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import {MenuProps} from '../hooks/useMenu'
 import useModal from '../hooks/useModal'
@@ -11,8 +12,7 @@ import textOverflow from '../styles/helpers/textOverflow'
 import {PALETTE} from '../styles/paletteV3'
 import {FONT_FAMILY} from '../styles/typographyV2'
 import {SprintPokerDefaults} from '../types/constEnums'
-import {GitHubFieldMenu_stage$key} from '../__generated__/GitHubFieldMenu_stage.graphql'
-import EditGitHubLabelTemplateModal from './EditGitHubLabelTemplateModal'
+import EditVotingLabelTemplateModal from './EditVotingLabelTemplateModal'
 import FlatButton from './FlatButton'
 import Menu from './Menu'
 import MenuItem from './MenuItem'
@@ -186,7 +186,7 @@ const GitHubFieldMenu = (props: Props) => {
         />
       </Menu>
       {modalPortal(
-        <EditGitHubLabelTemplateModal
+        <EditVotingLabelTemplateModal
           updateLabelTemplate={handleClick}
           closePortal={closeModal}
           defaultValue={serviceFieldTemplate}

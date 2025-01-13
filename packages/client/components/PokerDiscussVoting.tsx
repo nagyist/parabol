@@ -1,16 +1,16 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect, useMemo, useRef, useState} from 'react'
+import {Fragment, useEffect, useMemo, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
+import {PokerDiscussVoting_meeting$key} from '../__generated__/PokerDiscussVoting_meeting.graphql'
+import {
+  PokerDiscussVoting_stage$data,
+  PokerDiscussVoting_stage$key
+} from '../__generated__/PokerDiscussVoting_stage.graphql'
 import useForceUpdate from '../hooks/useForceUpdate'
 import {PokerCards} from '../types/constEnums'
 import isSpecialPokerLabel from '../utils/isSpecialPokerLabel'
-import {PokerDiscussVoting_meeting$key} from '../__generated__/PokerDiscussVoting_meeting.graphql'
-import {
-  PokerDiscussVoting_stage$key,
-  PokerDiscussVoting_stage$data
-} from '../__generated__/PokerDiscussVoting_stage.graphql'
 import PokerDimensionValueControl from './PokerDimensionValueControl'
 import PokerVotingRow from './PokerVotingRow'
 import useSetTaskEstimate from './useSetTaskEstimate'
@@ -177,14 +177,14 @@ const PokerDiscussVoting = (props: Props) => {
           }
 
           return (
-            <React.Fragment key={key}>
+            <Fragment key={key}>
               <PokerVotingRow
                 scaleValue={scaleValue}
                 scores={scores}
                 setFinalScore={canClick ? setFinalScore : undefined}
                 isInitialStageRender={isInitialStageRender}
               />
-            </React.Fragment>
+            </Fragment>
           )
         })}
       </GroupedVotes>

@@ -1,16 +1,11 @@
 import {CHECKIN} from '../../../client/utils/constants'
-import Meeting from '../../database/types/Meeting'
-import {Team} from '../../postgres/queries/getTeamsByIds'
-import MeetingMember from '../../database/types/MeetingMember'
-import MeetingRetrospective from '../../database/types/MeetingRetrospective'
-import MeetingTeamPrompt from '../../database/types/MeetingTeamPrompt'
 import MeetingTemplate from '../../database/types/MeetingTemplate'
+import {AnyMeeting, AnyMeetingMember} from '../../postgres/types/Meeting'
 
 export const createMeetingProperties = (
-  meeting: Meeting,
-  meetingMembers?: MeetingMember[],
-  template?: MeetingTemplate,
-  team?: Team
+  meeting: AnyMeeting,
+  meetingMembers?: AnyMeetingMember[],
+  template?: MeetingTemplate
 ) => {
   const {id: meetingId, teamId, facilitatorUserId, meetingType, phases} = meeting
   const hasIcebreaker = phases.some(({phaseType}) => phaseType === CHECKIN)
@@ -29,12 +24,8 @@ export const createMeetingProperties = (
     meetingTemplateIsFromParabol: template?.isStarter ?? false,
     meetingTemplateIsFree: template?.isFree ?? false,
     meetingTemplateCategory: template?.mainCategory,
-    meetingSeriesId:
-      meetingType === 'teamPrompt' ? (meeting as MeetingTeamPrompt).meetingSeriesId : undefined,
+    meetingSeriesId: meeting.meetingSeriesId,
     disableAnonymity:
-      meetingType === 'retrospective'
-        ? (meeting as MeetingRetrospective).disableAnonymity ?? false
-        : undefined,
-    isOneOnOneTeam: team?.isOneOnOneTeam
+      meetingType === 'retrospective' ? (meeting.disableAnonymity ?? false) : undefined
   }
 }

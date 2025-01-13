@@ -1,8 +1,9 @@
 import base64url from 'base64url'
 import crypto from 'crypto'
 import faker from 'faker'
-import getRethink from '../database/rethinkDriver'
+import {sql} from 'kysely'
 import ServerAuthToken from '../database/types/ServerAuthToken'
+import getKysely from '../postgres/getKysely'
 import encodeAuthToken from '../utils/encodeAuthToken'
 
 const HOST = process.env.GRAPHQL_HOST || 'localhost:3000'
@@ -31,11 +32,6 @@ export async function sendIntranet(req: {
   return response.json()
 }
 
-export const drainRethink = async () => {
-  const r = await getRethink()
-  r.getPoolMaster()?.drain()
-}
-
 const persistFunction = (text: string) => {
   const hasher = crypto.createHash('md5')
   hasher.update(text)
@@ -47,14 +43,18 @@ const persistFunction = (text: string) => {
 }
 
 const persistQuery = async (query: string) => {
-  const r = await getRethink()
+  const pg = getKysely()
   const id = persistFunction(query.trim())
   const record = {
     id,
     query,
     createdAt: new Date()
   }
-  await r.table('QueryMap').insert(record, {conflict: 'replace'}).run()
+  await pg
+    .insertInto('QueryMap')
+    .values(record)
+    .onConflict((oc) => oc.doNothing())
+    .execute()
   return id
 }
 
@@ -91,10 +91,10 @@ const SIGNUP_WITH_PASSWORD_MUTATION = `
     $email: ID!
     $password: String!
     $invitationToken: ID!
-    $segmentId: ID
+    $pseudoId: ID
     $params: String!
   ) {
-    signUpWithPassword(email: $email, password: $password, invitationToken: $invitationToken, segmentId: $segmentId, params: $params) {
+    signUpWithPassword(email: $email, password: $password, invitationToken: $invitationToken, pseudoId: $pseudoId, params: $params) {
       error {
         message
       }
@@ -135,7 +135,7 @@ export const signUpWithEmail = async (emailInput: string) => {
     variables: {
       email,
       password,
-      segmentId: null,
+      pseudoId: null,
       invitationToken: '',
       params: ''
     }
@@ -199,5 +199,60 @@ export const getUserTeams = async (userId: string) => {
       }
     }
   })
-  return user.data.user.teams
+  return user.data.user.teams as [{id: string}, ...{id: string}[]]
+}
+
+export const getUserOrgs = async (userId: string) => {
+  const user = await sendIntranet({
+    query: `
+      query User($userId: ID!) {
+        user(userId: $userId) {
+          id
+          organizations {
+            id
+          }
+        }
+      }
+    `,
+    variables: {
+      userId
+    },
+    isPrivate: true
+  })
+
+  expect(user).toMatchObject({
+    data: {
+      user: {
+        id: userId,
+        organizations: expect.arrayContaining([
+          {
+            id: expect.anything()
+          }
+        ])
+      }
+    }
+  })
+  return user.data.user.organizations as [{id: string}, ...{id: string}[]]
+}
+
+export const createPGTables = async (...tables: string[]) => {
+  const pg = getKysely()
+  await Promise.all(
+    tables.map(async (table) => {
+      return sql`
+      CREATE TABLE IF NOT EXISTS ${sql.table(table)} (like "public".${sql.table(table)} including ALL)`.execute(
+        pg
+      )
+    })
+  )
+  await truncatePGTables(...tables)
+}
+
+export const truncatePGTables = async (...tables: string[]) => {
+  const pg = getKysely()
+  await Promise.all(
+    tables.map(async (table) => {
+      return sql`TRUNCATE TABLE ${sql.table(table)} CASCADE`.execute(pg)
+    })
+  )
 }

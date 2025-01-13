@@ -1,4 +1,3 @@
-import React from 'react'
 import useTooltip from '~/hooks/useTooltip'
 import CardButton from '../../../../components/CardButton'
 import IconLabel from '../../../../components/IconLabel'
@@ -19,11 +18,10 @@ interface Props {
   mutationProps: MenuMutationProps
   task: any
   useTaskChild: UseTaskChild
-  dataCy: string
 }
 
 const TaskFooterIntegrateToggle = (props: Props) => {
-  const {mutationProps, task, useTaskChild, dataCy} = props
+  const {mutationProps, task, useTaskChild} = props
   const {togglePortal, originRef, menuPortal, menuProps, loadingWidth, loadingDelay} = useMenu(
     MenuPosition.UPPER_RIGHT,
     {
@@ -42,10 +40,9 @@ const TaskFooterIntegrateToggle = (props: Props) => {
         onClick={togglePortal}
         ref={originRef}
         onMouseEnter={TaskFooterIntegrateMenuRoot.preload}
-        dataCy={`${dataCy}-button`}
       >
         <IconLabel
-          icon='publish'
+          icon='widgets'
           onMouseEnter={openTooltip}
           onMouseLeave={closeTooltip}
           onClick={closeTooltip}

@@ -1,15 +1,15 @@
 import {GraphQLID, GraphQLNonNull, GraphQLObjectType} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import {maybeRemoveRestrictions} from '../../billing/helpers/teamLimitsCheck'
-import getRethink from '../../database/rethinkDriver'
-import NotificationTeamArchived from '../../database/types/NotificationTeamArchived'
+import TeamMemberId from '../../../client/shared/gqlIds/TeamMemberId'
+import generateUID from '../../generateUID'
+import getKysely from '../../postgres/getKysely'
 import removeMeetingTemplatesForTeam from '../../postgres/queries/removeMeetingTemplatesForTeam'
 import safeArchiveTeam from '../../safeMutations/safeArchiveTeam'
-import {getUserId, isSuperUser, isTeamLead} from '../../utils/authorization'
+import {analytics} from '../../utils/analytics/analytics'
+import {getUserId, isSuperUser, isUserOrgAdmin} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
-import {analytics} from '../../utils/analytics/analytics'
 
 export default {
   type: new GraphQLNonNull(
@@ -29,18 +29,25 @@ export default {
     {teamId}: {teamId: string},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {operationId, mutatorId}
 
     // AUTH
     const viewerId = getUserId(authToken)
-    if (!(await isTeamLead(viewerId, teamId)) && !isSuperUser(authToken)) {
-      return standardError(new Error('Not team lead'), {userId: viewerId})
+    const [teamMember, viewer, teamToArchive] = await Promise.all([
+      dataLoader.get('teamMembers').load(TeamMemberId.join(teamId, viewerId)),
+      dataLoader.get('users').loadNonNull(viewerId),
+      dataLoader.get('teams').loadNonNull(teamId)
+    ])
+    const isTeamLead = teamMember?.isLead
+    const isOrgAdmin = await isUserOrgAdmin(viewerId, teamToArchive.orgId, dataLoader)
+    if (!isTeamLead && !isSuperUser(authToken) && !isOrgAdmin) {
+      return standardError(new Error('Not team lead or org admin'), {userId: viewerId})
     }
 
     // RESOLUTION
-    analytics.archiveTeam(viewerId, teamId)
+    analytics.archiveTeam(viewer, teamId)
     const {team, users, removedSuggestedActionIds} = await safeArchiveTeam(teamId, dataLoader)
 
     if (!team) {
@@ -55,13 +62,16 @@ export default {
     const notifications = users
       .map((user) => user?.id)
       .filter((userId) => userId !== undefined && userId !== viewerId)
-      .map(
-        (notifiedUserId) =>
-          new NotificationTeamArchived({userId: notifiedUserId!, teamId, archivorUserId: viewerId})
-      )
+      .map((notifiedUserId) => ({
+        id: generateUID(),
+        type: 'TEAM_ARCHIVED' as const,
+        userId: notifiedUserId!,
+        teamId,
+        archivorUserId: viewerId
+      }))
 
     if (notifications.length) {
-      await r.table('Notification').insert(notifications).run()
+      await pg.insertInto('Notification').values(notifications).execute()
     }
 
     const data = {
@@ -77,8 +87,6 @@ export default {
       const {id, tms} = user
       publish(SubscriptionChannel.NOTIFICATION, id, 'AuthTokenPayload', {tms})
     })
-
-    await maybeRemoveRestrictions(team.orgId, dataLoader)
 
     return data
   }

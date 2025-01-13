@@ -1,25 +1,21 @@
-import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect, useState} from 'react'
+import {useEffect, useState} from 'react'
 import {PreloadedQuery, useFragment, usePaginationFragment, usePreloadedQuery} from 'react-relay'
 import useGetUsedServiceTaskIds from '~/hooks/useGetUsedServiceTaskIds'
 import useMutationProps from '~/hooks/useMutationProps'
 import CreateTaskMutation from '~/mutations/CreateTaskMutation'
 import dndNoise from '~/utils/dndNoise'
-import useAtmosphere from '../hooks/useAtmosphere'
-import useLoadNextOnScrollBottom from '../hooks/useLoadNextOnScrollBottom'
 import {ParabolScopingSearchResultsPaginationQuery} from '../__generated__/ParabolScopingSearchResultsPaginationQuery.graphql'
 import {ParabolScopingSearchResultsQuery} from '../__generated__/ParabolScopingSearchResultsQuery.graphql'
 import {ParabolScopingSearchResults_meeting$key} from '../__generated__/ParabolScopingSearchResults_meeting.graphql'
 import {ParabolScopingSearchResults_query$key} from '../__generated__/ParabolScopingSearchResults_query.graphql'
+import useAtmosphere from '../hooks/useAtmosphere'
+import useLoadNextOnScrollBottom from '../hooks/useLoadNextOnScrollBottom'
 import IntegrationScopingNoResults from './IntegrationScopingNoResults'
 import NewIntegrationRecordButton from './NewIntegrationRecordButton'
 import ParabolScopingSearchResultItem from './ParabolScopingSearchResultItem'
 import ParabolScopingSelectAllTasks from './ParabolScopingSelectAllTasks'
 
-const ResultScroller = styled('div')({
-  overflow: 'auto'
-})
 interface Props {
   queryRef: PreloadedQuery<ParabolScopingSearchResultsQuery>
   meetingRef: ParabolScopingSearchResults_meeting$key
@@ -145,7 +141,7 @@ const ParabolScopingSearchResults = (props: Props) => {
         tasks={edges}
         meetingId={meetingId}
       />
-      <ResultScroller>
+      <div className='overflow-auto'>
         {edges.map(({node}) => {
           return (
             <ParabolScopingSearchResultItem
@@ -159,7 +155,7 @@ const ParabolScopingSearchResults = (props: Props) => {
           )
         })}
         {lastItem}
-      </ResultScroller>
+      </div>
       {!isEditing && (
         <NewIntegrationRecordButton labelText={'New Task'} onClick={handleAddTaskClick} />
       )}

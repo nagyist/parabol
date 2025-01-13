@@ -1,5 +1,4 @@
 import logo from '../styles/theme/images/graphics/google-meet-icon.svg'
-import React from 'react'
 
 const GoogleMeetProviderLogo = () => {
   return (

@@ -1,23 +1,25 @@
 import styled from '@emotion/styled'
+import {Editor} from '@tiptap/core'
 import graphql from 'babel-plugin-relay/macro'
-import {EditorState} from 'draft-js'
-import React, {memo, RefObject} from 'react'
-import {useFragment} from 'react-relay'
-import EditingStatus from '~/components/EditingStatus/EditingStatus'
-import {PALETTE} from '~/styles/paletteV3'
+import {memo} from 'react'
+import {commitLocalUpdate, useFragment} from 'react-relay'
 import {OutcomeCard_task$key} from '~/__generated__/OutcomeCard_task.graphql'
 import {AreaEnum, TaskStatusEnum} from '~/__generated__/UpdateTaskMutation.graphql'
+import EditingStatus from '~/components/EditingStatus/EditingStatus'
+import {PALETTE} from '~/styles/paletteV3'
 import IntegratedTaskContent from '../../../../components/IntegratedTaskContent'
-import TaskEditor from '../../../../components/TaskEditor/TaskEditor'
+import {TipTapEditor} from '../../../../components/promptResponse/TipTapEditor'
+import {LinkMenuState} from '../../../../components/promptResponse/TipTapLinkMenu'
 import TaskIntegrationLink from '../../../../components/TaskIntegrationLink'
 import TaskWatermark from '../../../../components/TaskWatermark'
-import useTaskChildFocus, {UseTaskChild} from '../../../../hooks/useTaskChildFocus'
+import useAtmosphere from '../../../../hooks/useAtmosphere'
+import {UseTaskChild} from '../../../../hooks/useTaskChildFocus'
+import UpdateTaskMutation from '../../../../mutations/UpdateTaskMutation'
 import {cardFocusShadow, cardHoverShadow, cardShadow, Elevation} from '../../../../styles/elevation'
 import cardRootStyles from '../../../../styles/helpers/cardRootStyles'
 import {Card} from '../../../../types/constEnums'
 import isTaskArchived from '../../../../utils/isTaskArchived'
 import isTaskPrivate from '../../../../utils/isTaskPrivate'
-import isTempId from '../../../../utils/relay/isTempId'
 import {taskStatusLabels} from '../../../../utils/taskStatus'
 import TaskFooter from '../OutcomeCardFooter/TaskFooter'
 import OutcomeCardStatusIndicator from '../OutcomeCardStatusIndicator/OutcomeCardStatusIndicator'
@@ -37,12 +39,12 @@ const RootCard = styled('div')<{
   boxShadow: isDragging
     ? Elevation.CARD_DRAGGING
     : isTaskHighlighted
-    ? cardHoverShadow
-    : isTaskFocused
-    ? cardFocusShadow
-    : isTaskHovered
-    ? cardHoverShadow
-    : cardShadow
+      ? cardHoverShadow
+      : isTaskFocused
+        ? cardFocusShadow
+        : isTaskHovered
+          ? cardHoverShadow
+          : cardShadow
 }))
 
 const ContentBlock = styled('div')({
@@ -53,42 +55,46 @@ const StatusIndicatorBlock = styled('div')({
   display: 'flex'
 })
 
-const TaskEditorWrapper = styled('div')()
-
 interface Props {
   area: AreaEnum
   isTaskFocused: boolean
   isTaskHovered: boolean
-  editorRef: RefObject<HTMLTextAreaElement>
-  editorState: EditorState
+  editor: Editor
+  linkState: LinkMenuState
+  setLinkState: (linkState: LinkMenuState) => void
   handleCardUpdate: () => void
   isAgenda: boolean
   isDraggingOver: TaskStatusEnum | undefined
   task: OutcomeCard_task$key
-  setEditorState: (newEditorState: EditorState) => void
   useTaskChild: UseTaskChild
-  dataCy: string
+  addTaskChild(name: string): void
+  removeTaskChild(name: string): void
 }
 
 const OutcomeCard = memo((props: Props) => {
   const {
+    addTaskChild,
+    removeTaskChild,
     area,
     isTaskFocused,
     isTaskHovered,
-    editorRef,
-    editorState,
+    editor,
+    linkState,
+    setLinkState,
     handleCardUpdate,
     isAgenda,
     isDraggingOver,
     task: taskRef,
-    setEditorState,
-    useTaskChild,
-    dataCy
+    useTaskChild
   } = props
   const task = useFragment(
     graphql`
       fragment OutcomeCard_task on Task @argumentDefinitions(meetingId: {type: "ID"}) {
         ...IntegratedTaskContent_task
+        discussionId
+        editors {
+          userId
+        }
         id
         integration {
           __typename
@@ -96,9 +102,6 @@ const OutcomeCard = memo((props: Props) => {
         }
         status
         tags
-        team {
-          id
-        }
         # grab userId to ensure sorting on connections works
         userId
         isHighlighted(meetingId: $meetingId)
@@ -110,9 +113,34 @@ const OutcomeCard = memo((props: Props) => {
   )
   const isPrivate = isTaskPrivate(task.tags)
   const isArchived = isTaskArchived(task.tags)
-  const {integration, status, id: taskId, team, isHighlighted} = task
-  const {addTaskChild, removeTaskChild} = useTaskChildFocus(taskId)
-  const {id: teamId} = team
+  const toggleTag = (tagId: string) => {
+    const {state, view} = editor
+    const {doc, schema, tr} = state
+    if (task.tags.includes(tagId)) {
+      doc.descendants((node, pos) => {
+        if (node.type.name === 'taskTag' && node.attrs.id === tagId) {
+          tr.delete(pos, pos + node.nodeSize)
+        }
+      })
+      view.dispatch(tr)
+      const nextContent = JSON.stringify(editor.getJSON())
+      UpdateTaskMutation(atmosphere, {updatedTask: {id: taskId, content: nextContent}}, {})
+      return
+    }
+    // Create the mention node
+    const mentionNode = schema.nodes.taskTag!.create({id: tagId})
+
+    // Insert the mention node at the end
+    const transaction = tr.insert(doc.content.size, mentionNode)
+    view.dispatch(transaction)
+    const nextContent = JSON.stringify(editor.getJSON())
+    UpdateTaskMutation(atmosphere, {updatedTask: {id: taskId, content: nextContent}}, {})
+  }
+  const {integration, status, id: taskId, isHighlighted, editors, discussionId} = task
+  const atmosphere = useAtmosphere()
+  const {viewerId} = atmosphere
+  const otherEditors = editors.filter((editor) => editor.userId !== viewerId)
+  const isEditing = editors.length > otherEditors.length
   const type = integration?.__typename
   const statusTitle = `Card status: ${taskStatusLabels[status]}`
   const privateTitle = ', marked as #private'
@@ -120,6 +148,12 @@ const OutcomeCard = memo((props: Props) => {
   const statusIndicatorTitle = `${statusTitle}${isPrivate ? privateTitle : ''}${
     isArchived ? archivedTitle : ''
   }`
+  const onFocusChange = (isFocus: boolean) => () => {
+    if (!discussionId) return
+    commitLocalUpdate(atmosphere, (store) => {
+      store.get(discussionId)?.setValue(isFocus ? taskId : null, 'editingTaskId')
+    })
+  }
   return (
     <RootCard
       isTaskHovered={isTaskHovered}
@@ -135,7 +169,7 @@ const OutcomeCard = memo((props: Props) => {
           task={task}
           useTaskChild={useTaskChild}
         >
-          <StatusIndicatorBlock data-cy={`${dataCy}-status`} title={statusIndicatorTitle}>
+          <StatusIndicatorBlock title={statusIndicatorTitle}>
             <OutcomeCardStatusIndicator status={isDraggingOver || status} />
             {isPrivate && <OutcomeCardStatusIndicator status='private' />}
             {isArchived && <OutcomeCardStatusIndicator status='archived' />}
@@ -143,30 +177,29 @@ const OutcomeCard = memo((props: Props) => {
         </EditingStatus>
         <IntegratedTaskContent task={task} />
         {!type && (
-          <TaskEditorWrapper
+          <div
+            className='cursor-text'
             onBlur={() => {
               removeTaskChild('root')
               setTimeout(handleCardUpdate)
             }}
             onFocus={() => addTaskChild('root')}
           >
-            <TaskEditor
-              dataCy={`${dataCy}`}
-              editorRef={editorRef}
-              editorState={editorState}
-              readOnly={Boolean(isTempId(taskId) || isArchived || isDraggingOver || type)}
-              setEditorState={setEditorState}
-              teamId={teamId}
-              useTaskChild={useTaskChild}
+            <TipTapEditor
+              editor={editor}
+              linkState={linkState}
+              setLinkState={setLinkState}
+              useLinkEditor={() => useTaskChild('editor-link-changer')}
+              onBlur={onFocusChange(false)}
+              onFocus={onFocusChange(true)}
             />
-          </TaskEditorWrapper>
+          </div>
         )}
-        <TaskIntegrationLink dataCy={`${dataCy}`} integration={integration || null} />
+        <TaskIntegrationLink integration={integration || null} />
         <TaskFooter
-          dataCy={`${dataCy}`}
           area={area}
-          cardIsActive={isTaskFocused || isTaskHovered}
-          editorState={editorState}
+          cardIsActive={isTaskFocused || isTaskHovered || isEditing}
+          toggleTag={toggleTag}
           isAgenda={isAgenda}
           task={task}
           useTaskChild={useTaskChild}

@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react'
+import {useEffect, useState} from 'react'
 import DialogContent from './DialogContent'
 import DialogTitle from './DialogTitle'
 import InviteDialog from './InviteDialog'
@@ -26,7 +26,9 @@ const AuthProvider = () => {
         setError('Error logging in')
       }
     }
-    callOpener().catch()
+    callOpener().catch(() => {
+      /*ignore*/
+    })
   }, [])
 
   if (!error) return null

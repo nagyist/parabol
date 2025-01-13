@@ -1,13 +1,14 @@
-import React from 'react'
-import CopyToClipboard from 'react-copy-to-clipboard'
-import jiraSVG from '../../../styles/theme/images/graphics/jira.svg'
-import relativeDate from '../../../utils/date/relativeDate'
 import {Link} from '@mui/icons-material'
-import useTooltip from '../../../hooks/useTooltip'
-import {MenuPosition} from '../../../hooks/useCoords'
-import {useFragment} from 'react-relay'
 import graphql from 'babel-plugin-relay/macro'
+import CopyToClipboard from 'react-copy-to-clipboard'
+import {useFragment} from 'react-relay'
 import {JiraObjectCard_result$key} from '../../../__generated__/JiraObjectCard_result.graphql'
+import useAtmosphere from '../../../hooks/useAtmosphere'
+import {MenuPosition} from '../../../hooks/useCoords'
+import useTooltip from '../../../hooks/useTooltip'
+import jiraSVG from '../../../styles/theme/images/graphics/jira.svg'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
+import relativeDate from '../../../utils/date/relativeDate'
 import {mergeRefs} from '../../../utils/react/mergeRefs'
 
 interface Props {
@@ -36,6 +37,8 @@ const JiraObjectCard = (props: Props) => {
     resultRef
   )
 
+  const atmosphere = useAtmosphere()
+
   const {tooltipPortal, openTooltip, closeTooltip, originRef} = useTooltip<HTMLDivElement>(
     MenuPosition.UPPER_CENTER
   )
@@ -47,8 +50,21 @@ const JiraObjectCard = (props: Props) => {
     originRef: copiedTooltipRef
   } = useTooltip<HTMLDivElement>(MenuPosition.LOWER_CENTER)
 
+  const trackLinkClick = () => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Card Link Clicked', {
+      service: 'jira'
+    })
+  }
+
+  const trackCopy = () => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Card Copied', {
+      service: 'jira'
+    })
+  }
+
   const handleCopy = () => {
     openCopiedTooltip()
+    trackCopy()
     setTimeout(() => {
       closeCopiedTooltip()
     }, 2000)
@@ -65,13 +81,20 @@ const JiraObjectCard = (props: Props) => {
           target='_blank'
           className='font-semibold text-slate-600 hover:underline'
           rel='noreferrer'
+          onClick={trackLinkClick}
         >
           {issueKey}
         </a>
         <div>Updated {relativeDate(lastUpdated)}</div>
       </div>
       <div className='my-2 text-sm'>
-        <a href={url} target='_blank' className='hover:underline' rel='noreferrer'>
+        <a
+          href={url}
+          target='_blank'
+          className='hover:underline'
+          rel='noreferrer'
+          onClick={trackLinkClick}
+        >
           {summary}
         </a>
       </div>
@@ -86,6 +109,7 @@ const JiraObjectCard = (props: Props) => {
               target='_blank'
               className='text-xs text-slate-600 hover:underline'
               rel='noreferrer'
+              onClick={trackLinkClick}
             >
               {project.name}
             </a>

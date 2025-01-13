@@ -1,22 +1,23 @@
 import styled from '@emotion/styled'
 import {Cancel as CancelIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {FormEvent, useEffect, useRef, useState} from 'react'
+import * as React from 'react'
+import {FormEvent, useEffect, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import useMutationProps from '~/hooks/useMutationProps'
 import {PALETTE} from '~/styles/paletteV3'
+import {
+  NewTemplateScaleValueLabelInput_scale$data,
+  NewTemplateScaleValueLabelInput_scale$key
+} from '../../../__generated__/NewTemplateScaleValueLabelInput_scale.graphql'
 import useScrollIntoView from '../../../hooks/useScrollIntoVIew'
 import AddPokerTemplateScaleValueMutation from '../../../mutations/AddPokerTemplateScaleValueMutation'
 import palettePickerOptions from '../../../styles/palettePickerOptions'
+import {Threshold} from '../../../types/constEnums'
 import isSpecialPokerLabel from '../../../utils/isSpecialPokerLabel'
 import Legitity from '../../../validation/Legitity'
-import {
-  NewTemplateScaleValueLabelInput_scale$key,
-  NewTemplateScaleValueLabelInput_scale$data
-} from '../../../__generated__/NewTemplateScaleValueLabelInput_scale.graphql'
 import EditableTemplateScaleValueColor from './EditableTemplateScaleValueColor'
-import {Threshold} from '../../../types/constEnums'
 
 const Form = styled('form')({
   width: '100%',

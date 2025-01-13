@@ -1,9 +1,9 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import {EditorState} from 'draft-js'
-import React, {RefObject, useEffect, useMemo, useRef} from 'react'
+import {RefObject, useEffect, useMemo, useRef} from 'react'
 import {useFragment} from 'react-relay'
 import {PhaseItemColumn_prompt$key} from '~/__generated__/PhaseItemColumn_prompt.graphql'
+import {PhaseItemColumn_meeting$key} from '../../__generated__/PhaseItemColumn_meeting.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
 import {MenuPosition} from '../../hooks/useCoords'
 import useForceUpdate from '../../hooks/useForceUpdate'
@@ -13,7 +13,6 @@ import {DECELERATE} from '../../styles/animation'
 import {PALETTE} from '../../styles/paletteV3'
 import {BezierCurve, ElementWidth, Gutters} from '../../types/constEnums'
 import getNextSortOrder from '../../utils/getNextSortOrder'
-import {PhaseItemColumn_meeting$key} from '../../__generated__/PhaseItemColumn_meeting.graphql'
 import RetroPrompt from '../RetroPrompt'
 import PhaseItemChits from './PhaseItemChits'
 import PhaseItemEditor from './PhaseItemEditor'
@@ -126,7 +125,7 @@ const ChitSection = styled('div')<{isDesktop: boolean}>(({isDesktop}) => ({
 
 export interface ReflectColumnCardInFlight {
   key: string
-  editorState: EditorState
+  html: string
   transform: string
   isStart: boolean
 }

@@ -1,40 +1,38 @@
 import {AuthTokenRole} from 'parabol-client/types/constEnums'
 import generateUID from '../../generateUID'
+import {TierEnum} from '../../graphql/public/resolverTypes'
 import {USER_PREFERRED_NAME_LIMIT} from '../../postgres/constants'
+import {defaultTier} from '../../utils/defaultTier'
 import AuthIdentity from './AuthIdentity'
-import {TierEnum} from './Invoice'
 
 interface Input {
   id?: string
   preferredName: string
   email: string
-  featureFlags?: string[]
+  favoriteTemplateIds?: string[]
   lastSeenAt?: Date
   lastSeenAtURLs?: string[]
   updatedAt?: Date
-  picture?: string
+  picture: string
   inactive?: boolean
   identities?: AuthIdentity[]
   isWatched?: boolean
   createdAt?: Date
-  segmentId?: string | null
+  pseudoId?: string | null
   sendSummaryEmail?: boolean
   tier?: TierEnum
   tms?: string[]
 }
 
-const letters = 'abcdefghijklmnopqrstuvwxyz'
-const AVATAR_BUCKET = `https://${process.env.AWS_S3_BUCKET}/static/avatars`
-
 export default class User {
   id: string
   preferredName: string
   email: string
-  featureFlags: string[]
+  favoriteTemplateIds: string[]
   lastSeenAt: Date
   lastSeenAtURLs: string[] | null
   updatedAt: Date
-  newFeatureId?: string | null
+  newFeatureId?: number | null
   overLimitCopy?: string | null
   picture: string
   inactive: boolean
@@ -42,7 +40,7 @@ export default class User {
   isRemoved?: boolean
   isWatched?: boolean
   createdAt: Date
-  segmentId?: string
+  pseudoId?: string
   sendSummaryEmail?: boolean
   tier: TierEnum
   tms: string[]
@@ -57,40 +55,33 @@ export default class User {
       createdAt,
       picture,
       updatedAt,
-      featureFlags,
+      favoriteTemplateIds,
       lastSeenAt,
       lastSeenAtURLs,
       identities,
       inactive,
       isWatched,
       preferredName,
-      segmentId,
+      pseudoId,
       sendSummaryEmail,
       tier
     } = input
-    const avatarName =
-      preferredName
-        .toLowerCase()
-        .split('')
-        .filter((letter) => letters.includes(letter))
-        .slice(0, 2)
-        .join('') || 'pa'
     const now = new Date()
     this.id = id ?? `local|${generateUID()}`
     this.tms = tms || []
     this.email = email
     this.createdAt = createdAt || now
-    this.picture = picture || `${AVATAR_BUCKET}/${avatarName}.png`
+    this.picture = picture
     this.updatedAt = updatedAt || now
-    this.featureFlags = featureFlags || []
+    this.favoriteTemplateIds = favoriteTemplateIds || []
     this.identities = identities || []
     this.inactive = inactive || false
     this.isWatched = isWatched || false
     this.lastSeenAt = lastSeenAt ?? new Date()
     this.lastSeenAtURLs = lastSeenAtURLs ?? null
     this.preferredName = preferredName.trim().slice(0, USER_PREFERRED_NAME_LIMIT)
-    this.segmentId = segmentId ?? undefined
+    this.pseudoId = pseudoId ?? undefined
     this.sendSummaryEmail = sendSummaryEmail ?? true
-    this.tier = tier ?? 'starter'
+    this.tier = tier ?? defaultTier
   }
 }

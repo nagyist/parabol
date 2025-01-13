@@ -14,12 +14,9 @@ declare module 'string-score'
 declare module 'babel-plugin-relay/macro' {
   export {graphql as default} from 'react-relay'
 }
-declare module 'unicode-substring'
-declare module 'emoji-mart/dist-modern/utils/index.js'
-declare module 'emoji-mart/dist-modern/utils/data.js'
-declare module 'emoji-mart/dist-modern/components/picker/nimble-picker'
 declare module 'react-textarea-autosize'
 declare module 'react-copy-to-clipboard'
+declare module 'tayden-clusterfck'
 
 declare let __webpack_public_path__: string
 declare const __PRODUCTION__: string
@@ -34,17 +31,26 @@ interface Window {
     github: string
     google: string
     googleAnalytics: string
+    mattermostDisabled: boolean | undefined
+    msTeamsDisabled: boolean | undefined
     publicPath: string
-    segment: string
     sentry: string
     slack: string
     stripe: string
     oauth2Redirect: string
+    hasOpenAI: boolean
     prblIn: string | undefined
     AUTH_INTERNAL_ENABLED: boolean
     AUTH_GOOGLE_ENABLED: boolean
+    AUTH_MICROSOFT_ENABLED: boolean
     AUTH_SSO_ENABLED: boolean
     AMPLITUDE_WRITE_KEY: string
+    microsoftTenantId: string
+    microsoft: string
+    GLOBAL_BANNER_ENABLED: boolean
+    GLOBAL_BANNER_TEXT: string
+    GLOBAL_BANNER_BG_COLOR: string
+    GLOBAL_BANNER_COLOR: string
   }
 }
 declare type Json = null | boolean | number | string | Json[] | {[key: string]: Json}

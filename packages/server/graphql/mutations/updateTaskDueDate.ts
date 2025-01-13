@@ -1,14 +1,14 @@
 import {GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import isValidDate from 'parabol-client/utils/isValidDate'
-import getRethink from '../../database/rethinkDriver'
+import getKysely from '../../postgres/getKysely'
+import {analytics} from '../../utils/analytics/analytics'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import GraphQLISO8601Type from '../types/GraphQLISO8601Type'
 import UpdateTaskDueDatePayload from '../types/UpdateTaskDueDatePayload'
 import {GQLContext} from './../graphql'
-import {analytics} from '../../utils/analytics/analytics'
 
 export default {
   type: UpdateTaskDueDatePayload,
@@ -28,7 +28,7 @@ export default {
     {taskId, dueDate}: {taskId: string; dueDate: string | null},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
@@ -38,20 +38,17 @@ export default {
     // VALIDATION
     const formattedDueDate = dueDate && new Date(dueDate)
     const nextDueDate = isValidDate(formattedDueDate) ? formattedDueDate : null
-    const task = await r.table('Task').get(taskId).run()
+    const [task, viewer] = await Promise.all([
+      dataLoader.get('tasks').load(taskId),
+      dataLoader.get('users').loadNonNull(viewerId)
+    ])
     if (!task || !isTeamMember(authToken, task.teamId)) {
       return standardError(new Error('Task not found'), {userId: viewerId})
     }
 
     // RESOLUTION
-    await r
-      .table('Task')
-      .get(taskId)
-      .update({
-        dueDate: nextDueDate
-      })
-      .run()
-
+    await pg.updateTable('Task').set({dueDate: nextDueDate}).where('id', '=', taskId).execute()
+    dataLoader.clearAll('tasks')
     const data = {taskId}
 
     // send task updated messages
@@ -65,7 +62,7 @@ export default {
         publish(SubscriptionChannel.TASK, userId, 'UpdateTaskDueDatePayload', data, subOptions)
       })
     }
-    analytics.taskDueDateSet(viewerId, task.teamId, taskId)
+    analytics.taskDueDateSet(viewer, task.teamId, taskId)
     return data
   }
 }

@@ -1,14 +1,13 @@
-import React from 'react'
 import graphql from 'babel-plugin-relay/macro'
 import {PreloadedQuery, usePreloadedQuery} from 'react-relay'
+import halloweenRetrospectiveTemplate from '../../../../../static/images/illustrations/halloweenRetrospectiveTemplate.png'
 import {
   ParabolTasksResultsQuery,
   TaskStatusEnum
 } from '../../../__generated__/ParabolTasksResultsQuery.graphql'
-import NullableTask from '../../NullableTask/NullableTask'
-import halloweenRetrospectiveTemplate from '../../../../../static/images/illustrations/halloweenRetrospectiveTemplate.png'
-import {taskStatusLabels} from '../../../utils/taskStatus'
 import useAtmosphere from '../../../hooks/useAtmosphere'
+import {taskStatusLabels} from '../../../utils/taskStatus'
+import NullableTask from '../../NullableTask/NullableTask'
 
 interface Props {
   queryRef: PreloadedQuery<ParabolTasksResultsQuery>
@@ -50,13 +49,12 @@ const ParabolTasksResults = (props: Props) => {
     .filter((task) => task.status === selectedStatus)
 
   return (
-    <div className='flex h-full flex-col items-center gap-y-2 overflow-auto px-4 pt-1 pb-4'>
+    <div className='flex h-full flex-col items-center gap-y-2 overflow-auto px-4 pb-4 pt-1'>
       {selectedTasks.length > 0 ? (
         selectedTasks.map((task) => (
           <NullableTask
             className='w-full rounded border border-solid border-slate-100'
             key={task.id}
-            dataCy='foo'
             area={'userDash'}
             task={task}
           />

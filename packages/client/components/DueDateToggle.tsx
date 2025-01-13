@@ -2,16 +2,15 @@ import styled from '@emotion/styled'
 import {AccessTime} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
 import ms from 'ms'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import useTooltip from '~/hooks/useTooltip'
+import {DueDateToggle_task$key} from '../__generated__/DueDateToggle_task.graphql'
 import {MenuPosition} from '../hooks/useCoords'
 import useMenu from '../hooks/useMenu'
 import {UseTaskChild} from '../hooks/useTaskChildFocus'
 import {PALETTE} from '../styles/paletteV3'
 import lazyPreload from '../utils/lazyPreload'
 import {shortMonths} from '../utils/makeDateString'
-import {DueDateToggle_task$key} from '../__generated__/DueDateToggle_task.graphql'
 import CardButton from './CardButton'
 
 interface StyleProps {
@@ -114,7 +113,7 @@ const formatDueDate = (dueDate: string) => {
 }
 
 const action = 'tap to change'
-const getDateInfo = (dueDate: string | null) => {
+const getDateInfo = (dueDate: string | null | undefined) => {
   if (!dueDate) return {title: 'Add a Due Date'}
   const date = new Date(dueDate)
   const timeDiff = date.getTime() - Date.now()

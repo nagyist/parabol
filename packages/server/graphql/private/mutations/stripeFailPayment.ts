@@ -1,13 +1,12 @@
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import Stripe from 'stripe'
 import terminateSubscription from '../../../billing/helpers/terminateSubscription'
-import getRethink from '../../../database/rethinkDriver'
-import NotificationPaymentRejected from '../../../database/types/NotificationPaymentRejected'
+import generateUID from '../../../generateUID'
+import getKysely from '../../../postgres/getKysely'
 import {isSuperUser} from '../../../utils/authorization'
 import publish from '../../../utils/publish'
 import {getStripeManager} from '../../../utils/stripe'
 import {MutationResolvers} from '../resolverTypes'
-import updateTeamByOrgId from '../../../postgres/queries/updateTeamByOrgId'
 
 export type StripeFailPaymentPayloadSource =
   | {
@@ -26,7 +25,7 @@ const stripeFailPayment: MutationResolvers['stripeFailPayment'] = async (
     throw new Error('Don’t be rude.')
   }
 
-  const r = await getRethink()
+  const pg = getKysely()
   const manager = getStripeManager()
 
   // VALIDATION
@@ -75,16 +74,12 @@ const stripeFailPayment: MutationResolvers['stripeFailPayment'] = async (
     // After 23 hours subscription updates to incomplete_expired and the invoice becomes void.
     // Not to handle this particular case in 23 hours, we do it now
     await terminateSubscription(orgId)
-  } else {
-    // Keep subscription, but disable teams
-    await updateTeamByOrgId({isPaid: false}, orgId)
   }
-
-  const billingLeaderUserIds = (await r
-    .table('OrganizationUser')
-    .getAll(orgId, {index: 'orgId'})
-    .filter({removedAt: null, role: 'BILLING_LEADER'})('userId')
-    .run()) as string[]
+  const orgUsers = await dataLoader.get('organizationUsersByOrgId').load(orgId)
+  const billingLeaderOrgUsers = orgUsers.filter(
+    ({role}) => role && ['BILLING_LEADER', 'ORG_ADMIN'].includes(role)
+  )
+  const billingLeaderUserIds = billingLeaderOrgUsers.map(({userId}) => userId)
 
   const {default_source} = customer
 
@@ -101,14 +96,16 @@ const stripeFailPayment: MutationResolvers['stripeFailPayment'] = async (
   }
   const {last4, brand} = creditCard
 
-  const notifications = billingLeaderUserIds.map(
-    (userId) => new NotificationPaymentRejected({orgId, last4, brand, userId})
-  )
+  const notifications = billingLeaderUserIds.map((userId) => ({
+    id: generateUID(),
+    type: 'PAYMENT_REJECTED' as const,
+    orgId,
+    last4: Number(last4),
+    brand,
+    userId
+  }))
 
-  await r({
-    update: r.table('Invoice').get(invoiceId).update({status: 'FAILED'}),
-    insert: r.table('Notification').insert(notifications)
-  }).run()
+  await pg.insertInto('Notification').values(notifications).execute()
 
   notifications.forEach((notification) => {
     const data = {orgId, notificationId: notification.id}

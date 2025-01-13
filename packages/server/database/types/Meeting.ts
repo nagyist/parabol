@@ -1,21 +1,22 @@
 import generateUID from '../../generateUID'
 import {MeetingTypeEnum} from '../../postgres/types/Meeting'
+import {NewMeetingPhase} from '../../postgres/types/NewMeetingPhase'
 import GenericMeetingPhase from './GenericMeetingPhase'
 
 interface Input {
-  id?: string
+  id?: string | null
   teamId: string
   meetingType: MeetingTypeEnum
   meetingCount: number
-  name?: string
+  name?: string | null
   // Every meeting has at least one phase
-  phases: [GenericMeetingPhase, ...GenericMeetingPhase[]]
+  phases: [NewMeetingPhase, ...NewMeetingPhase[]]
   facilitatorUserId: string
-  showConversionModal?: boolean
-  meetingSeriesId?: number
-  scheduledEndTime?: Date
-  summary?: string
-  sentimentScore?: number
+  showConversionModal?: boolean | null
+  meetingSeriesId?: number | null
+  scheduledEndTime?: Date | null
+  summary?: string | null
+  sentimentScore?: number | null
 }
 
 const namePrefix = {
@@ -27,25 +28,25 @@ export default abstract class Meeting {
   isLegacy?: boolean // true if old version of action meeting
   createdAt = new Date()
   updatedAt = new Date()
-  createdBy: string
+  createdBy: string | null
   endedAt: Date | undefined | null = undefined
-  facilitatorStageId: string | undefined
-  facilitatorUserId: string
+  facilitatorStageId: string
+  facilitatorUserId: string | null
   meetingCount: number
   meetingNumber: number
   name: string
-  summarySentAt: Date | undefined = undefined
+  summarySentAt: Date | undefined | null = undefined
   teamId: string
   meetingType: MeetingTypeEnum
   phases: GenericMeetingPhase[]
-  showConversionModal?: boolean
-  meetingSeriesId?: number
+  showConversionModal?: boolean | null
+  meetingSeriesId?: number | null
   scheduledEndTime?: Date | null
-  summary?: string
-  sentimentScore?: number
-  usedReactjis?: Record<string, number>
-  slackTs?: string
-  engagement?: number
+  summary?: string | null
+  sentimentScore?: number | null
+  usedReactjis?: Record<string, number> | null
+  slackTs?: string | number | null
+  engagement?: number | null
 
   constructor(input: Input) {
     const {

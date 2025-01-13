@@ -1,10 +1,10 @@
-import React from 'react'
 import graphql from 'babel-plugin-relay/macro'
 import {useFragment} from 'react-relay'
 import {JiraIntegrationPanel_meeting$key} from '../../../__generated__/JiraIntegrationPanel_meeting.graphql'
-import AtlassianClientManager from '../../../utils/AtlassianClientManager'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import useMutationProps from '../../../hooks/useMutationProps'
+import AtlassianClientManager from '../../../utils/AtlassianClientManager'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
 import JiraIntegrationResultsRoot from './JiraIntegrationResultsRoot'
 
 interface Props {
@@ -16,6 +16,8 @@ const JiraIntegrationPanel = (props: Props) => {
   const meeting = useFragment(
     graphql`
       fragment JiraIntegrationPanel_meeting on TeamPromptMeeting {
+        id
+        teamId
         viewerMeetingMember {
           teamMember {
             teamId
@@ -42,6 +44,12 @@ const JiraIntegrationPanel = (props: Props) => {
       return onError(new Error('Could not find team member'))
     }
     AtlassianClientManager.openOAuth(atmosphere, teamMember.teamId, mutationProps)
+
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Integration Connected', {
+      teamId: meeting.teamId,
+      meetingId: meeting.id,
+      service: 'jira'
+    })
   }
 
   return (

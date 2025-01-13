@@ -1,6 +1,6 @@
 import {GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import getRethink from '../../database/rethinkDriver'
+import getKysely from '../../postgres/getKysely'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
@@ -21,13 +21,13 @@ export default {
     {taskId}: {taskId: string},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
     const viewerId = getUserId(authToken)
 
     // AUTH
-    const task = await r.table('Task').get(taskId).run()
+    const task = await dataLoader.get('tasks').load(taskId)
     if (!task) {
       return {error: {message: 'Task not found'}}
     }
@@ -37,20 +37,9 @@ export default {
     }
 
     // RESOLUTION
-    const {subscribedUserIds} = await r({
-      task: r.table('Task').get(taskId).delete(),
-      taskHistory: r
-        .table('TaskHistory')
-        .between([taskId, r.minval], [taskId, r.maxval], {
-          index: 'taskIdUpdatedAt'
-        })
-        .delete(),
-      subscribedUserIds: r
-        .table('TeamMember')
-        .getAll(teamId, {index: 'teamId'})
-        .filter({isNotRemoved: true})('userId')
-        .coerceTo('array') as unknown as string[]
-    }).run()
+    const teamMembers = await dataLoader.get('teamMembersByTeamId').load(teamId)
+    const subscribedUserIds = teamMembers.map(({userId}) => userId)
+    await pg.deleteFrom('Task').where('id', '=', taskId).execute()
     const {tags, userId: taskUserId} = task
 
     const data = {task}

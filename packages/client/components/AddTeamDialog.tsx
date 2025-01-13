@@ -1,27 +1,27 @@
-import React, {useState} from 'react'
-import {PreloadedQuery, usePreloadedQuery, useFragment} from 'react-relay'
-import FlatPrimaryButton from './FlatPrimaryButton'
-import {Dialog} from '../ui/Dialog/Dialog'
-import {DialogContent} from '../ui/Dialog/DialogContent'
-import {DialogTitle} from '../ui/Dialog/DialogTitle'
-import {DialogActions} from '../ui/Dialog/DialogActions'
-import {Select} from '../ui/Select/Select'
-import {SelectItem} from '../ui/Select/SelectItem'
-import {SelectTrigger} from '../ui/Select/SelectTrigger'
-import {SelectGroup} from '../ui/Select/SelectGroup'
-import {SelectValue} from '../ui/Select/SelectValue'
-import {SelectContent} from '../ui/Select/SelectContent'
 import graphql from 'babel-plugin-relay/macro'
+import {useState} from 'react'
+import {PreloadedQuery, useFragment, usePreloadedQuery} from 'react-relay'
+import useRouter from '~/hooks/useRouter'
+import AddTeamMutation from '~/mutations/AddTeamMutation'
+import SendClientSideEvent from '~/utils/SendClientSideEvent'
+import getGraphQLError from '~/utils/relay/getGraphQLError'
 import {AddTeamDialogQuery} from '../__generated__/AddTeamDialogQuery.graphql'
 import {AddTeamDialog_viewer$key} from '../__generated__/AddTeamDialog_viewer.graphql'
-import useMutationProps from '../hooks/useMutationProps'
-import useAtmosphere from '../hooks/useAtmosphere'
 import {AdhocTeamMultiSelect, Option} from '../components/AdhocTeamMultiSelect/AdhocTeamMultiSelect'
+import useAtmosphere from '../hooks/useAtmosphere'
+import useMutationProps from '../hooks/useMutationProps'
+import {Dialog} from '../ui/Dialog/Dialog'
+import {DialogActions} from '../ui/Dialog/DialogActions'
+import {DialogContent} from '../ui/Dialog/DialogContent'
+import {DialogTitle} from '../ui/Dialog/DialogTitle'
 import {Input} from '../ui/Input/Input'
-import AddTeamMutation from '~/mutations/AddTeamMutation'
-import useRouter from '~/hooks/useRouter'
-import getGraphQLError from '~/utils/relay/getGraphQLError'
-import SendClientSegmentEventMutation from '~/mutations/SendClientSegmentEventMutation'
+import {Select} from '../ui/Select/Select'
+import {SelectContent} from '../ui/Select/SelectContent'
+import {SelectGroup} from '../ui/Select/SelectGroup'
+import {SelectItem} from '../ui/Select/SelectItem'
+import {SelectTrigger} from '../ui/Select/SelectTrigger'
+import {SelectValue} from '../ui/Select/SelectValue'
+import FlatPrimaryButton from './FlatPrimaryButton'
 
 interface Props {
   isOpen: boolean
@@ -102,7 +102,7 @@ const AddTeamDialog = (props: Props) => {
     }
 
     if (newUsers.length && newUsers.length > selectedUsers.length) {
-      SendClientSegmentEventMutation(atmosphere, 'Teammate Selected', {
+      SendClientSideEvent(atmosphere, 'Teammate Selected', {
         selectionLocation: 'addTeamUserPicker'
       })
     }

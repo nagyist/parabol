@@ -1,6 +1,5 @@
 import styled from '@emotion/styled'
 import sanitizeSVG from '@mattkrick/sanitize-svg'
-import React from 'react'
 import UploadOrgImageMutation from '~/mutations/UploadOrgImageMutation'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useMutationProps from '../hooks/useMutationProps'
@@ -32,10 +31,6 @@ const ModalBoundary = styled('div')({
 
 const StyledDialogTitle = styled(DialogTitle)({
   textAlign: 'center'
-})
-
-const AvatarWithShadow = styled(Avatar)({
-  boxShadow: `0px 4px 5px 0px #DADADA`
 })
 
 interface Props {
@@ -76,7 +71,10 @@ const OrgAvatarInput = (props: Props) => {
     <ModalBoundary>
       <StyledDialogTitle>{'Upload a New Photo'}</StyledDialogTitle>
       <AvatarBlock>
-        <AvatarWithShadow picture={picture} size={96} />
+        <Avatar
+          picture={picture}
+          className='h-24 w-24 shadow-[0_4px_5px_0px_rgba(218,218,218,1)]'
+        />
       </AvatarBlock>
       <AvatarInput error={error?.message} onSubmit={onSubmit} />
     </ModalBoundary>

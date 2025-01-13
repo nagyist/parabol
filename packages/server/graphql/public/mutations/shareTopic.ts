@@ -1,9 +1,9 @@
+import DiscussStage from '../../../database/types/DiscussStage'
 import {getUserId, isTeamMember} from '../../../utils/authorization'
+import getPhase from '../../../utils/getPhase'
 import standardError from '../../../utils/standardError'
 import {SlackNotifier} from '../../mutations/helpers/notifications/SlackNotifier'
 import {MutationResolvers} from '../resolverTypes'
-import DiscussStage from '../../../database/types/DiscussStage'
-import getPhase from '../../../utils/getPhase'
 
 const shareTopic: MutationResolvers['shareTopic'] = async (
   _source,
@@ -11,7 +11,7 @@ const shareTopic: MutationResolvers['shareTopic'] = async (
   {authToken, dataLoader}
 ) => {
   const viewerId = getUserId(authToken)
-  const meeting = await dataLoader.get('newMeetings').load(meetingId)
+  const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
   const {teamId} = meeting
 
   if (!isTeamMember(authToken, teamId)) {

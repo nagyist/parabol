@@ -1,7 +1,7 @@
 import TeamMemberId from '../../../../client/shared/gqlIds/TeamMemberId'
 import EstimatePhase from '../../../database/types/EstimatePhase'
-import Meeting from '../../../database/types/Meeting'
-import {getTeamPromptResponsesByMeetingId} from '../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
+import {AnyMeeting} from '../../../postgres/types/Meeting'
+import {NewMeetingStages} from '../../../postgres/types/NewMeetingPhase'
 import getPhase from '../../../utils/getPhase'
 import {DataLoaderWorker} from '../../graphql'
 import isValid from '../../isValid'
@@ -14,7 +14,7 @@ import isValid from '../../isValid'
  * **sprint poker**: meeting members facilitated, voted discussed or reacted / total meeting members
  * **standup**: replied, commented or reacted / all members
  */
-const calculateEngagement = async (meeting: Meeting, dataLoader: DataLoaderWorker) => {
+const calculateEngagement = async (meeting: AnyMeeting, dataLoader: DataLoaderWorker) => {
   const {id: meetingId, phases, meetingType, facilitatorUserId} = meeting
 
   if (meetingType === 'action') return undefined
@@ -46,6 +46,7 @@ const calculateEngagement = async (meeting: Meeting, dataLoader: DataLoaderWorke
   if (getPhase(phases, 'reflect')) {
     const reflections = await dataLoader.get('retroReflectionsByMeetingId').load(meetingId)
     reflections.forEach(({creatorId, reactjis}) => {
+      if (!creatorId) return
       passiveMembers.delete(creatorId)
       reactjis.forEach(({userId}) => {
         passiveMembers.delete(userId)
@@ -56,7 +57,7 @@ const calculateEngagement = async (meeting: Meeting, dataLoader: DataLoaderWorke
 
   // Team prompt responses
   if (getPhase(phases, 'RESPONSES')) {
-    const responses = await getTeamPromptResponsesByMeetingId(meetingId)
+    const responses = await dataLoader.get('teamPromptResponsesByMeetingId').load(meetingId)
     responses.forEach(({userId, reactjis}) => {
       passiveMembers.delete(userId)
       reactjis.forEach(({userId}) => {
@@ -78,7 +79,7 @@ const calculateEngagement = async (meeting: Meeting, dataLoader: DataLoaderWorke
   }
 
   // Discussions can happen in many different stage types: discuss, ESTIMATE, reflect, RESPONSES
-  const stages = phases.flatMap(({stages}) => stages)
+  const stages = phases.flatMap(({stages}) => stages as NewMeetingStages[])
   const discussionIds = stages
     .map((stage) => 'discussionId' in stage && stage.discussionId)
     .filter(isValid) as string[]
@@ -88,7 +89,7 @@ const calculateEngagement = async (meeting: Meeting, dataLoader: DataLoaderWorke
   ])
   const threadables = [...discussions.flat(), ...tasks.flat()]
   threadables.forEach(({createdBy}) => {
-    passiveMembers.delete(createdBy)
+    createdBy && passiveMembers.delete(createdBy)
   })
 
   discussions.forEach((comments) => {

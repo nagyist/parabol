@@ -13,14 +13,9 @@ type TeamMemberIntegrations {
   atlassian: AtlassianIntegration
 
   """
-  All things associated with a Jira Server integration for a team member
+  All things associated with a Jira Data Center integration for a team member
   """
   jiraServer: JiraServerIntegration!
-
-  """
-  All things associated with a Gcal integration for a team member
-  """
-  gcal: GcalIntegration
 
   """
   All things associated with a GitHub integration for a team member
@@ -51,4 +46,9 @@ type TeamMemberIntegrations {
   All things associated with a Microsoft Teams integration for a team member
   """
   msTeams: MSTeamsIntegration!
+
+  """
+  All things associated with a Gcal integration for a team member
+  """
+  gcal: GcalIntegration
 }

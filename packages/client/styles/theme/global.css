@@ -65,7 +65,7 @@
     2) prevent a horizontal scrollbar from causing a vertical scrollbar due to the 100vh
   */
   #root {
-    @apply w-full h-screen p-0 m-0 bg-slate-200;
+    @apply m-0 h-screen w-full bg-slate-200 p-0;
   }
 
   *,
@@ -149,24 +149,6 @@
       display: none !important;
     }
   }
-
-  /*::-webkit-scrollbar {
-    -webkit-appearance: none;
-    width:6px;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    border-radius:3px;
-    background-color:rgba(0, 0, 0, 0.3);
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background:rgba(0, 0, 0, 0.5);
-  }
-
-  ::-webkit-scrollbar-thumb:window-inactive {
-    background:rgba(0, 0, 0, 0.2);
-  }*/
 }
 
 /** Customize daypicker styles */
@@ -179,11 +161,77 @@
   --rdp-background-color-dark: theme(colors.grape.500 / 30%);
 }
 
-/** Customize draft-js */
-.draft-blockquote {
-  @apply my-[8px] mx-0 border-l-2 border-solid border-l-slate-500 px-[8px] py-0 italic;
+.link-style a {
+  @apply text-sky-500;
+  text-decoration: underline;
 }
 
-.draft-codeblock {
-  @apply m-0 rounded-[1px] border-l-2 border-solid border-l-slate-500 bg-slate-200 py-0 px-[8px] font-mono font-[13px] leading-normal;
+/** Customize TipTap */
+
+.ProseMirror {
+  width: 100%;
+  blockquote {
+    border-left: 3px solid theme(colors.slate.500);
+    margin: 1.5rem 0;
+    padding-left: 1rem;
+  }
+}
+
+.ProseMirror .search-result {
+  background-color: rgba(255, 217, 0, 0.5);
+}
+
+.ProseMirror :is(ul, ol) {
+  list-style-position: outside;
+  padding-inline-start: 16px;
+  margin-block-start: 4px;
+  margin-block-end: 4px;
+}
+
+.ProseMirror :is(ol) {
+  margin-inline-start: 2px;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror [data-type='mention'] {
+  background-color: theme('colors.gold.100');
+  border-radius: 2;
+  font-weight: 600;
+}
+
+.ProseMirror [data-type='taskTag'] {
+  font-weight: 600;
+}
+
+.ProseMirror-focused:focus {
+  outline: none;
+}
+
+.ProseMirror a {
+  text-decoration: underline;
+  color: theme('colors.slate.700');
+  :hover {
+    cursor: pointer;
+  }
+}
+
+.ProseMirror p {
+  margin-block-start: 4px;
+  margin-block-end: 4px;
+  line-height: 1rem;
+}
+
+hr.ProseMirror-selectednode {
+  border-top: 1px solid #68cef8;
+}
+
+.ProseMirror hr {
+  border-top: 1px solid theme('colors.slate.400');
 }

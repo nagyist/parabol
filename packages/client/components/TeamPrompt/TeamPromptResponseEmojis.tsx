@@ -5,7 +5,6 @@ import useAtmosphere from '../../hooks/useAtmosphere'
 import useMutationProps from '../../hooks/useMutationProps'
 import AddReactjiToReactableMutation from '../../mutations/AddReactjiToReactableMutation'
 import ReactjiId from '../../shared/gqlIds/ReactjiId'
-import React from 'react'
 import ReactjiSection from '../ReflectionCard/ReactjiSection'
 
 interface Props {
@@ -53,5 +52,5 @@ export const TeamPromptResponseEmojis = (props: Props) => {
     )
   }
 
-  return <ReactjiSection className='pt-2 pr-2' reactjis={reactjis} onToggle={onToggleReactji} />
+  return <ReactjiSection className='pr-2 pt-2' reactjis={reactjis} onToggle={onToggleReactji} />
 }

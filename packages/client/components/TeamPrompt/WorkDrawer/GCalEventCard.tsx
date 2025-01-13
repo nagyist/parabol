@@ -1,14 +1,15 @@
-import React from 'react'
-import CopyToClipboard from 'react-copy-to-clipboard'
-import useTooltip from '../../../hooks/useTooltip'
-import {MenuPosition} from '../../../hooks/useCoords'
-import {useFragment} from 'react-relay'
-import graphql from 'babel-plugin-relay/macro'
-import {GCalEventCard_event$key} from '../../../__generated__/GCalEventCard_event.graphql'
-import {mergeRefs} from '../../../utils/react/mergeRefs'
-import clsx from 'clsx'
 import {ContentCopy} from '@mui/icons-material'
+import graphql from 'babel-plugin-relay/macro'
+import clsx from 'clsx'
 import ms from 'ms'
+import CopyToClipboard from 'react-copy-to-clipboard'
+import {useFragment} from 'react-relay'
+import {GCalEventCard_event$key} from '../../../__generated__/GCalEventCard_event.graphql'
+import useAtmosphere from '../../../hooks/useAtmosphere'
+import {MenuPosition} from '../../../hooks/useCoords'
+import useTooltip from '../../../hooks/useTooltip'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
+import {mergeRefs} from '../../../utils/react/mergeRefs'
 
 interface Props {
   eventRef: GCalEventCard_event$key
@@ -81,6 +82,8 @@ const GCalEventCard = (props: Props) => {
     eventRef
   )
 
+  const atmosphere = useAtmosphere()
+
   const {tooltipPortal, openTooltip, closeTooltip, originRef} = useTooltip<HTMLDivElement>(
     MenuPosition.UPPER_CENTER
   )
@@ -94,6 +97,7 @@ const GCalEventCard = (props: Props) => {
 
   const handleCopy = () => {
     openCopiedTooltip()
+    trackCopy()
     setTimeout(() => {
       closeCopiedTooltip()
     }, 2000)
@@ -101,6 +105,18 @@ const GCalEventCard = (props: Props) => {
 
   const startDate = result.startDate ? new Date(result.startDate) : null
   const endDate = result.endDate ? new Date(result.endDate) : null
+
+  const trackLinkClick = () => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Card Link Clicked', {
+      service: 'gcal'
+    })
+  }
+
+  const trackCopy = () => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Card Copied', {
+      service: 'gcal'
+    })
+  }
 
   return (
     <div className='group'>
@@ -113,6 +129,7 @@ const GCalEventCard = (props: Props) => {
             href={result.link ?? undefined}
             target='_blank'
             rel='noreferrer'
+            onClick={trackLinkClick}
           >
             {result.summary}
           </a>

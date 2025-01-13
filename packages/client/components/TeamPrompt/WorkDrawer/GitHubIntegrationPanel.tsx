@@ -1,12 +1,13 @@
-import React, {useState} from 'react'
 import graphql from 'babel-plugin-relay/macro'
+import clsx from 'clsx'
+import {useState} from 'react'
 import {useFragment} from 'react-relay'
 import {GitHubIntegrationPanel_meeting$key} from '../../../__generated__/GitHubIntegrationPanel_meeting.graphql'
-import clsx from 'clsx'
-import gitHubSVG from '../../../styles/theme/images/graphics/github-circle.svg'
-import GitHubClientManager from '../../../utils/GitHubClientManager'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import useMutationProps from '../../../hooks/useMutationProps'
+import gitHubSVG from '../../../styles/theme/images/graphics/github-circle.svg'
+import GitHubClientManager from '../../../utils/GitHubClientManager'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
 import GitHubIntegrationResultsRoot from './GitHubIntegrationResultsRoot'
 import GitHubRepoFilterBar from './GitHubRepoFilterBar'
 
@@ -30,6 +31,8 @@ const GitHubIntegrationPanel = (props: Props) => {
   const meeting = useFragment(
     graphql`
       fragment GitHubIntegrationPanel_meeting on TeamPromptMeeting {
+        teamId
+        id
         viewerMeetingMember {
           teamMember {
             teamId
@@ -60,6 +63,19 @@ const GitHubIntegrationPanel = (props: Props) => {
       return onError(new Error('Could not find team member'))
     }
     teamMember && GitHubClientManager.openOAuth(atmosphere, teamMember.teamId, mutationProps)
+
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Integration Connected', {
+      teamId: meeting.teamId,
+      meetingId: meeting.id,
+      service: 'github'
+    })
+  }
+
+  const trackTabNavigated = (label: string) => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Tag Navigated', {
+      service: 'github',
+      buttonLabel: label
+    })
   }
 
   return (
@@ -69,19 +85,29 @@ const GitHubIntegrationPanel = (props: Props) => {
           <GitHubRepoFilterBar
             teamMemberRef={teamMember}
             selectedRepos={selectedRepos}
-            setSelectedRepos={setSelectedRepos}
+            setSelectedRepos={(repos) => {
+              SendClientSideEvent(atmosphere, 'Your Work Filter Changed', {
+                teamId: meeting.teamId,
+                meetingId: meeting.id,
+                service: 'github'
+              })
+              setSelectedRepos(repos)
+            }}
           />
           <div className='mb-4 flex w-full gap-2 px-4'>
             {GITHUB_QUERY_TABS.map((tab) => (
               <div
                 key={tab.key}
                 className={clsx(
-                  'w-1/2 cursor-pointer rounded-full py-2 px-4 text-center text-sm leading-3 text-slate-800',
+                  'w-1/2 cursor-pointer rounded-full px-4 py-2 text-center text-sm leading-3 text-slate-800',
                   tab.key === githubType
                     ? 'bg-grape-700 font-semibold text-white focus:text-white'
                     : 'border border-slate-300 bg-white'
                 )}
-                onClick={() => setGithubType(tab.key)}
+                onClick={() => {
+                  trackTabNavigated(tab.label)
+                  setGithubType(tab.key)
+                }}
               >
                 {tab.label}
               </div>

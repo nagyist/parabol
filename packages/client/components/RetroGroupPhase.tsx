@@ -3,11 +3,18 @@ import graphql from 'babel-plugin-relay/macro'
  * Renders the UI for the reflection phase of the retrospective meeting
  *
  */
-import React from 'react'
-import {useFragment} from 'react-relay'
+import styled from '@emotion/styled'
 import {Info as InfoIcon} from '@mui/icons-material'
-import useCallbackRef from '~/hooks/useCallbackRef'
+import {useFragment} from 'react-relay'
 import {RetroGroupPhase_meeting$key} from '~/__generated__/RetroGroupPhase_meeting.graphql'
+import useCallbackRef from '~/hooks/useCallbackRef'
+import useAtmosphere from '../hooks/useAtmosphere'
+import {MenuPosition} from '../hooks/useCoords'
+import useMutationProps from '../hooks/useMutationProps'
+import useTooltip from '../hooks/useTooltip'
+import AutogroupMutation from '../mutations/AutogroupMutation'
+import ResetReflectionGroupsMutation from '../mutations/ResetReflectionGroupsMutation'
+import {Elevation} from '../styles/elevation'
 import {phaseLabelLookup} from '../utils/meetings/lookups'
 import GroupingKanban from './GroupingKanban'
 import MeetingContent from './MeetingContent'
@@ -17,17 +24,9 @@ import MeetingTopBar from './MeetingTopBar'
 import PhaseHeaderDescription from './PhaseHeaderDescription'
 import PhaseHeaderTitle from './PhaseHeaderTitle'
 import PhaseWrapper from './PhaseWrapper'
+import PrimaryButton from './PrimaryButton'
 import {RetroMeetingPhaseProps} from './RetroMeeting'
 import StageTimerDisplay from './StageTimerDisplay'
-import PrimaryButton from './PrimaryButton'
-import styled from '@emotion/styled'
-import AutogroupMutation from '../mutations/AutogroupMutation'
-import ResetReflectionGroupsMutation from '../mutations/ResetReflectionGroupsMutation'
-import useAtmosphere from '../hooks/useAtmosphere'
-import useMutationProps from '../hooks/useMutationProps'
-import {Elevation} from '../styles/elevation'
-import useTooltip from '../hooks/useTooltip'
-import {MenuPosition} from '../hooks/useCoords'
 
 const ButtonWrapper = styled('div')({
   display: 'flex',
@@ -64,9 +63,7 @@ const RetroGroupPhase = (props: Props) => {
         }
         organization {
           tier
-          featureFlags {
-            suggestGroups
-          }
+          useAI
         }
       }
     `,
@@ -83,8 +80,7 @@ const RetroGroupPhase = (props: Props) => {
     autogroupReflectionGroups,
     resetReflectionGroups
   } = meeting
-  const {featureFlags, tier} = organization
-  const {suggestGroups: hasSuggestGroupsFlag} = featureFlags
+  const {useAI, tier} = organization
   const {openTooltip, closeTooltip, tooltipPortal, originRef} = useTooltip<HTMLDivElement>(
     MenuPosition.UPPER_CENTER
   )
@@ -107,7 +103,8 @@ const RetroGroupPhase = (props: Props) => {
 
   return (
     <>
-      <MeetingContent ref={callbackRef}>
+      {/* select-none is for Safari. Repro: drag a card & see the whole area get highlighted */}
+      <MeetingContent ref={callbackRef} className='select-none'>
         <MeetingHeaderAndPhase hideBottomBar={!!endedAt}>
           <MeetingTopBar
             avatarGroup={avatarGroup}
@@ -118,7 +115,7 @@ const RetroGroupPhase = (props: Props) => {
             <PhaseHeaderDescription>
               {'Drag cards to group by common topics'}
             </PhaseHeaderDescription>
-            {hasSuggestGroupsFlag &&
+            {useAI &&
               (showSuggestGroups ? (
                 <ButtonWrapper>
                   <StyledButton

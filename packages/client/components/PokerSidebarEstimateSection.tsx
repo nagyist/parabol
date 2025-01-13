@@ -1,10 +1,9 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {DragDropContext, Draggable, Droppable, DropResult} from 'react-beautiful-dnd'
 import {useFragment} from 'react-relay'
-import useGotoStageId from '~/hooks/useGotoStageId'
 import {PokerSidebarEstimateSection_meeting$key} from '~/__generated__/PokerSidebarEstimateSection_meeting.graphql'
+import useGotoStageId from '~/hooks/useGotoStageId'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useMakeStageSummaries from '../hooks/useMakeStageSummaries'
 import DragEstimatingTaskMutation from '../mutations/DragEstimatingTaskMutation'
@@ -113,7 +112,9 @@ const PokerSidebarEstimateSection = (props: Props) => {
   const handleClick = (stageIds: string[]) => {
     // if the facilitator is at one of the stages, go there
     if (stageIds.includes(facilitatorStageId)) {
-      gotoStageId(facilitatorStageId).catch()
+      gotoStageId(facilitatorStageId).catch(() => {
+        /*ignore*/
+      })
     } else {
       // goto the first stage that the user hasn't voted on
       const summaryStages = stageIds.map((id) => stages.find((stage) => stage.id === id))

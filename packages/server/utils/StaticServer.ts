@@ -2,6 +2,7 @@ import fs from 'fs'
 import mime from 'mime-types'
 import path from 'path'
 import {brotliCompressSync} from 'zlib'
+import {Logger} from './Logger'
 import isCompressible from './isCompressible'
 class StaticFileMeta {
   mtime: string
@@ -31,7 +32,6 @@ interface MetaDict {
 }
 
 interface Options {
-  filesToCache: string[]
   staticPaths: {
     [pathname: string]: boolean
   }
@@ -53,11 +53,9 @@ const makePathnames = (dirname: string, pathnames: PathNames, prefix: string) =>
 }
 export default class StaticServer {
   pathnames: PathNames = {}
-  cachedFileSet: Set<string>
   meta: MetaDict = {}
   constructor(options: Options) {
-    const {filesToCache, staticPaths} = options
-    this.cachedFileSet = new Set(filesToCache)
+    const {staticPaths} = options
     Object.keys(staticPaths).forEach((dirname) => {
       if (!staticPaths[dirname]) return
       try {
@@ -66,7 +64,7 @@ export default class StaticServer {
         }
         makePathnames(dirname, this.pathnames, '')
       } catch (e) {
-        console.log(e)
+        Logger.log(e)
       }
     })
   }

@@ -1,23 +1,21 @@
 import ms from 'ms'
-import {getUserId} from '../../../utils/authorization'
-import {MutationResolvers} from '../resolverTypes'
+import generateUID from '../../../generateUID'
 import getKysely from '../../../postgres/getKysely'
-import {getEligibleOrgIdsByDomain} from '../../../utils/isRequestToJoinDomainAllowed'
-import getTeamIdsByOrgIds from '../../../postgres/queries/getTeamIdsByOrgIds'
-import getRethink from '../../../database/rethinkDriver'
-import NotificationRequestToJoinOrg from '../../../database/types/NotificationRequestToJoinOrg'
-import publishNotification from './helpers/publishNotification'
+import {getUserId} from '../../../utils/authorization'
 import getDomainFromEmail from '../../../utils/getDomainFromEmail'
+import {getEligibleOrgIdsByDomain} from '../../../utils/isRequestToJoinDomainAllowed'
 import standardError from '../../../utils/standardError'
+import isValid from '../../isValid'
+import {MutationResolvers} from '../resolverTypes'
+import publishNotification from './helpers/publishNotification'
 
 const REQUEST_EXPIRATION_DAYS = 30
 
 const requestToJoinDomain: MutationResolvers['requestToJoinDomain'] = async (
   _source,
-  {},
+  _args,
   {authToken, dataLoader}
 ) => {
-  const r = await getRethink()
   const operationId = dataLoader.share()
   const subOptions = {operationId}
   const pg = getKysely()
@@ -48,31 +46,26 @@ const requestToJoinDomain: MutationResolvers['requestToJoinDomain'] = async (
     return {success: true}
   }
 
-  const teamIds = await getTeamIdsByOrgIds(orgIds)
+  const orgTeams = (await dataLoader.get('teamsByOrgIds').loadMany(orgIds)).filter(isValid).flat()
+  const teamIds = orgTeams.map(({id}) => id)
+  const teamMembers = (await dataLoader.get('teamMembersByTeamId').loadMany(teamIds))
+    .filter(isValid)
+    .flat()
+  const leadTeamMembers = teamMembers.filter(({isLead}) => isLead)
+  const leadUserIds = [...new Set(leadTeamMembers.map(({userId}) => userId))]
 
-  const leadUserIds = (await r
-    .table('TeamMember')
-    .getAll(r.args(teamIds), {index: 'teamId'})
-    .filter({
-      isNotRemoved: true,
-      isLead: true
-    })
-    .pluck('userId')
-    .distinct()('userId')
-    .run()) as string[]
+  const notificationsToInsert = leadUserIds.map((userId) => ({
+    id: generateUID(),
+    type: 'REQUEST_TO_JOIN_ORG' as const,
+    userId,
+    email: viewer.email,
+    name: viewer.preferredName,
+    picture: viewer.picture,
+    requestCreatedBy: viewerId,
+    domainJoinRequestId: insertResult.id
+  }))
 
-  const notificationsToInsert = leadUserIds.map((userId) => {
-    return new NotificationRequestToJoinOrg({
-      userId,
-      email: viewer.email,
-      name: viewer.preferredName,
-      picture: viewer.picture,
-      requestCreatedBy: viewerId,
-      domainJoinRequestId: insertResult.id
-    })
-  })
-
-  await r.table('Notification').insert(notificationsToInsert).run()
+  await pg.insertInto('Notification').values(notificationsToInsert).execute()
 
   notificationsToInsert.forEach((notification) => {
     publishNotification(notification, subOptions)

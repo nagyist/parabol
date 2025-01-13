@@ -1,17 +1,18 @@
-import React, {useState} from 'react'
 import graphql from 'babel-plugin-relay/macro'
+import clsx from 'clsx'
+import {useState} from 'react'
 import {useFragment} from 'react-relay'
-import {TaskStatusEnum} from '../../../__generated__/ParabolTasksResultsQuery.graphql'
 import {ParabolTasksPanel_meeting$key} from '../../../__generated__/ParabolTasksPanel_meeting.graphql'
-import {TaskStatus} from '../../../types/constEnums'
-import {meetingColumnArray} from '../../../utils/constants'
-import {taskStatusLabels} from '../../../utils/taskStatus'
+import {TaskStatusEnum} from '../../../__generated__/ParabolTasksResultsQuery.graphql'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import CreateTaskMutation from '../../../mutations/CreateTaskMutation'
+import {TaskStatus} from '../../../types/constEnums'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
+import {meetingColumnArray} from '../../../utils/constants'
 import dndNoise from '../../../utils/dndNoise'
+import {taskStatusLabels} from '../../../utils/taskStatus'
 import AddTaskButton from '../../AddTaskButton'
 import ParabolTasksResultsRoot from './ParabolTasksResultsRoot'
-import clsx from 'clsx'
 
 interface Props {
   meetingRef: ParabolTasksPanel_meeting$key
@@ -49,6 +50,13 @@ const ParabolTasksPanel = (props: Props) => {
     )
   }
 
+  const trackTabNavigated = (label: string) => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Tag Navigated', {
+      service: 'PARABOL',
+      buttonLabel: label
+    })
+  }
+
   return (
     <>
       <div>
@@ -57,12 +65,15 @@ const ParabolTasksPanel = (props: Props) => {
             <div
               key={status}
               className={clsx(
-                'flex-shrink-0 cursor-pointer rounded-full py-2 px-4 text-sm leading-3 text-slate-800',
+                'flex-shrink-0 cursor-pointer rounded-full px-4 py-2 text-sm leading-3 text-slate-800',
                 status === selectedStatus
                   ? 'bg-grape-700 font-semibold text-white focus:text-white'
                   : 'border border-slate-300 bg-white'
               )}
-              onClick={() => setSelectedStatus(status)}
+              onClick={() => {
+                trackTabNavigated(taskStatusLabels[status])
+                setSelectedStatus(status)
+              }}
             >
               {taskStatusLabels[status]}
             </div>
@@ -71,7 +82,7 @@ const ParabolTasksPanel = (props: Props) => {
       </div>
       <ParabolTasksResultsRoot selectedStatus={selectedStatus} />
       <div className='flex items-center justify-center border-t border-solid border-slate-200 p-2'>
-        <AddTaskButton dataCy={`your-work-task`} onClick={handleAddTask} />
+        <AddTaskButton onClick={handleAddTask} />
       </div>
     </>
   )

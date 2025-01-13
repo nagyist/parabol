@@ -1,5 +1,4 @@
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {PreloadedQuery, useFragment, usePreloadedQuery, useRefetchableFragment} from 'react-relay'
 import {OrgBillingQuery} from '../../../../__generated__/OrgBillingQuery.graphql'
 import {OrgBillingRefetchQuery} from '../../../../__generated__/OrgBillingRefetchQuery.graphql'
@@ -40,17 +39,17 @@ const OrgBilling = (props: Props) => {
         ...OrgBillingUpgrade_organization
         ...OrgBillingDangerZone_organization
         id
-        tier
+        billingTier
       }
     `,
     organizationRef
   )
-  const {tier} = organization
+  const {billingTier} = organization
 
   return (
     <div>
       <OrgBillingUpgrade organization={organization} invoiceListRefetch={refetch} />
-      {tier === 'team' && (
+      {billingTier === 'team' && (
         <>
           <OrgBillingCreditCardInfoOld organization={organization} />
           <OrgBillingInvoices queryRef={queryData} />

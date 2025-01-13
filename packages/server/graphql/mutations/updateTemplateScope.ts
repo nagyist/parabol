@@ -1,21 +1,16 @@
 import {GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import getRethink from '../../database/rethinkDriver'
-import {RDatum} from '../../database/stricterR'
 import {SharingScopeEnum as ESharingScope} from '../../database/types/MeetingTemplate'
 import PokerTemplate from '../../database/types/PokerTemplate'
 import ReflectTemplate from '../../database/types/ReflectTemplate'
-import RetrospectivePrompt from '../../database/types/RetrospectivePrompt'
-import TemplateDimension from '../../database/types/TemplateDimension'
-import insertMeetingTemplate from '../../postgres/queries/insertMeetingTemplate'
-import removeMeetingTemplate from '../../postgres/queries/removeMeetingTemplate'
-import updateMeetingTemplateScope from '../../postgres/queries/updateMeetingTemplateScope'
+import generateUID from '../../generateUID'
+import getKysely from '../../postgres/getKysely'
+import {analytics} from '../../utils/analytics/analytics'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import {GQLContext} from '../graphql'
 import SharingScopeEnum, {SharingScopeEnumType} from '../types/SharingScopeEnum'
 import UpdateTemplateScopePayload from '../types/UpdateTemplateScopePayload'
-import sendTemplateEventToSegment from './helpers/sendTemplateEventToSegment'
 
 const updateTemplateScope = {
   type: new GraphQLNonNull(UpdateTemplateScopePayload),
@@ -35,13 +30,16 @@ const updateTemplateScope = {
     {templateId, scope: newScope}: {templateId: string; scope: SharingScopeEnumType},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) => {
-    const r = await getRethink()
+    const pg = getKysely()
     const now = new Date()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
     const viewerId = getUserId(authToken)
     //AUTH
-    const template = await dataLoader.get('meetingTemplates').load(templateId)
+    const [template, viewer] = await Promise.all([
+      dataLoader.get('meetingTemplates').load(templateId),
+      dataLoader.get('users').loadNonNull(viewerId)
+    ])
     if (!template || !template.isActive) {
       return {error: {message: `Template not found`}}
     }
@@ -59,19 +57,20 @@ const updateTemplateScope = {
     template.scope = newScope // mutate the cached record
     const SCOPES: ESharingScope[] = ['TEAM', 'ORGANIZATION', 'PUBLIC']
     const isDownscope = SCOPES.indexOf(newScope) < SCOPES.indexOf(scope)
-    const shouldClone = isDownscope
-      ? await r
-          .table('NewMeeting')
-          .getAll(templateId, {index: 'templateId'})
-          .filter((meeting: RDatum) => meeting('teamId').ne(teamId))
-          .nth(0)
-          .default(null)
-          .ne(null)
-          .run()
-      : false
+    const usedMeeting = isDownscope
+      ? await pg
+          .selectFrom('NewMeeting')
+          .select('id')
+          .where('templateId', '=', templateId)
+          .where('teamId', '!=', teamId)
+          .limit(1)
+          .executeTakeFirst()
+      : null
+    const shouldClone = !!usedMeeting
     let clonedTemplateId: string | undefined
 
     const cloneReflectTemplate = async () => {
+      const pg = getKysely()
       const clonedTemplate = new ReflectTemplate({
         name,
         teamId,
@@ -87,19 +86,32 @@ const updateTemplateScope = {
       const activePrompts = prompts.filter(({removedAt}) => !removedAt)
       const promptIds = activePrompts.map(({id}) => id)
       const clonedPrompts = activePrompts.map((prompt) => {
-        return new RetrospectivePrompt({
-          ...prompt,
+        return {
+          id: generateUID(),
+          teamId: prompt.teamId,
           templateId: clonedTemplateId!,
           parentPromptId: prompt.id,
+          sortOrder: prompt.sortOrder,
+          question: prompt.question,
+          description: prompt.description,
+          groupColor: prompt.groupColor,
           removedAt: null
-        })
+        }
       })
-      await Promise.all([
-        insertMeetingTemplate(clonedTemplate),
-        removeMeetingTemplate(templateId),
-        r.table('ReflectPrompt').insert(clonedPrompts).run(),
-        r.table('ReflectPrompt').getAll(r.args(promptIds)).update({removedAt: now}).run()
-      ])
+      await pg
+        .with('MeetingTemplateInsert', (qc) =>
+          qc.insertInto('MeetingTemplate').values(clonedTemplate)
+        )
+        .with('MeetingTemplateDeactivate', (qc) =>
+          qc.updateTable('MeetingTemplate').set({isActive: false}).where('id', '=', templateId)
+        )
+        .with('RemovePrompts', (qc) =>
+          qc.updateTable('ReflectPrompt').set({removedAt: now}).where('id', 'in', promptIds)
+        )
+        .insertInto('ReflectPrompt')
+        .values(clonedPrompts.map((p) => ({...p, sortOrder: String(p.sortOrder)})))
+        .execute()
+      dataLoader.clearAll(['reflectPrompts', 'meetingTemplates'])
     }
 
     const clonePokerTemplate = async () => {
@@ -114,22 +126,31 @@ const updateTemplateScope = {
         mainCategory: template.mainCategory
       })
       clonedTemplateId = clonedTemplate.id
-      const dimensions = await dataLoader.get('templateDimensionsByTemplateId').load(templateId)
-      const activeDimensions = dimensions.filter(({removedAt}) => !removedAt)
+      const activeDimensions = await dataLoader
+        .get('templateDimensionsByTemplateId')
+        .load(templateId)
       const dimensionIds = activeDimensions.map(({id}) => id)
-      const clonedDimensions = activeDimensions.map((dimension) => {
-        return new TemplateDimension({
-          ...dimension,
-          templateId: clonedTemplateId!
-        })
-      })
+      const clonedDimensions = activeDimensions.map((dimension) => ({
+        ...dimension,
+        id: generateUID(),
+        templateId: clonedTemplateId!
+      }))
 
-      await Promise.all([
-        insertMeetingTemplate(clonedTemplate),
-        removeMeetingTemplate(templateId),
-        r.table('TemplateDimension').insert(clonedDimensions).run(),
-        r.table('TemplateDimension').getAll(r.args(dimensionIds)).update({removedAt: now}).run()
-      ])
+      await getKysely()
+        .with('MeetingTemplateInsert', (qc) =>
+          qc.insertInto('MeetingTemplate').values(clonedTemplate)
+        )
+        .with('MeetingTemplateDeactivate', (qc) =>
+          qc.updateTable('MeetingTemplate').set({isActive: false}).where('id', '=', templateId)
+        )
+        .with('TemplateDimensionInsert', (qc) =>
+          qc.insertInto('TemplateDimension').values(clonedDimensions)
+        )
+        .updateTable('TemplateDimension')
+        .set({removedAt: now})
+        .where('id', 'in', dimensionIds)
+        .execute()
+      dataLoader.clearAll(['templateDimensions', 'meetingTemplates'])
     }
 
     if (shouldClone) {
@@ -139,11 +160,15 @@ const updateTemplateScope = {
         clonePokerTemplate()
       }
     } else {
-      await updateMeetingTemplateScope(templateId, newScope)
+      await getKysely()
+        .updateTable('MeetingTemplate')
+        .set({scope: newScope})
+        .where('id', '=', templateId)
+        .execute()
     }
     const data = {templateId, teamId, clonedTemplateId}
 
-    sendTemplateEventToSegment(viewerId, {...template, scope: newScope}, 'Template Shared')
+    analytics.templateMetrics(viewer, {...template, scope: newScope}, 'Template Shared')
     // technically, this affects every connected client (public), or every team in the org (organization), but those are edge cases
     publish(SubscriptionChannel.ORGANIZATION, orgId, 'UpdateTemplateScopeSuccess', data, subOptions)
     return data

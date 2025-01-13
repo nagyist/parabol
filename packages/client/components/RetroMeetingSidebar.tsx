@@ -1,12 +1,12 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {Fragment, useState} from 'react'
+import {Fragment, useState} from 'react'
 import {useFragment} from 'react-relay'
-import useRouter from '~/hooks/useRouter'
-import isDemoRoute from '~/utils/isDemoRoute'
 import {
   NewMeetingPhaseTypeEnum,
   RetroMeetingSidebar_meeting$key
 } from '~/__generated__/RetroMeetingSidebar_meeting.graphql'
+import useRouter from '~/hooks/useRouter'
+import isDemoRoute from '~/utils/isDemoRoute'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useGotoStageId from '../hooks/useGotoStageId'
 import getSidebarItemStage from '../utils/getSidebarItemStage'
@@ -116,7 +116,9 @@ const RetroMeetingSidebar = (props: Props) => {
               confirmingPhase === phaseType
             ) {
               setConfirmingPhase(null)
-              gotoStageId(itemStageId).catch()
+              gotoStageId(itemStageId).catch(() => {
+                /*ignore*/
+              })
               handleMenuClick()
             } else {
               setConfirmingPhase(phaseType)

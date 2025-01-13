@@ -1,9 +1,9 @@
 import {GraphQLID, GraphQLNonNull, GraphQLString} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import MeetingPoker from '../../database/types/MeetingPoker'
 import upsertAzureDevOpsDimensionFieldMap, {
   AzureDevOpsFieldMapProps
 } from '../../postgres/queries/upsertAzureDevOpsDimensionFieldMap'
+import {Logger} from '../../utils/Logger'
 import {isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import {GQLContext} from '../graphql'
@@ -57,7 +57,7 @@ const updateAzureDevOpsDimensionField = {
     },
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) => {
-    //console.log(`Inside updateAzureDevOpsDimensionField`)
+    //Logger.log(`Inside updateAzureDevOpsDimensionField`)
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
@@ -66,7 +66,10 @@ const updateAzureDevOpsDimensionField = {
     if (!meeting) {
       return {error: {message: 'Invalid meetingId'}}
     }
-    const {teamId, templateRefId} = meeting as MeetingPoker
+    if (meeting.meetingType !== 'poker') {
+      return {error: {message: 'Not a poker meeting'}}
+    }
+    const {teamId, templateRefId} = meeting
     if (!isTeamMember(authToken, teamId)) {
       return {error: {message: 'Not on team'}}
     }
@@ -91,7 +94,7 @@ const updateAzureDevOpsDimensionField = {
       } as AzureDevOpsFieldMapProps
       await upsertAzureDevOpsDimensionFieldMap(props)
     } catch (e) {
-      console.log(e)
+      Logger.log(e)
     }
 
     const data = {teamId, meetingId}

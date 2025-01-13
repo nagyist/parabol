@@ -1,15 +1,13 @@
-import React from 'react'
+import {ExpandMore, FilterList} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import {FilterList} from '@mui/icons-material'
-import useMenu from '../../../hooks/useMenu'
-import {MenuPosition} from '../../../hooks/useCoords'
-import GitHubRepoSearchFilterMenu from '../../GitHubRepoSearchFilterMenu'
+import clsx from 'clsx'
 import {useFragment} from 'react-relay'
 import {GitHubRepoFilterBar_teamMember$key} from '../../../__generated__/GitHubRepoFilterBar_teamMember.graphql'
-import {ExpandMore} from '@mui/icons-material'
+import {MenuPosition} from '../../../hooks/useCoords'
+import useMenu from '../../../hooks/useMenu'
 import {PortalStatus} from '../../../hooks/usePortal'
-import clsx from 'clsx'
 import plural from '../../../utils/plural'
+import GitHubRepoSearchFilterMenu from '../../GitHubRepoSearchFilterMenu'
 
 interface Props {
   teamMemberRef: GitHubRepoFilterBar_teamMember$key
@@ -43,7 +41,7 @@ const GitHubRepoFilterBar = (props: Props) => {
     <>
       <button
         className={clsx(
-          'mx-4 mt-4 mb-2 flex cursor-pointer items-center gap-2 rounded border border-solid bg-white py-0.5 px-3 text-left transition',
+          'mx-4 mb-2 mt-4 flex cursor-pointer items-center gap-2 rounded border border-solid bg-white px-3 py-0.5 text-left transition',
           isMenuOpen
             ? 'border-sky-400 hover:border-sky-500'
             : 'border-slate-300 hover:border-slate-500'

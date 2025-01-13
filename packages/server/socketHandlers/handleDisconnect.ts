@@ -1,6 +1,6 @@
-import closeTransport from '../socketHelpers/closeTransport'
+import activeClients from '../activeClients'
 import ConnectionContext from '../socketHelpers/ConnectionContext'
-import sseClients from '../sseClients'
+import closeTransport from '../socketHelpers/closeTransport'
 import {getUserId} from '../utils/authorization'
 import publishInternalGQL from '../utils/publishInternalGQL'
 import relayUnsubscribeAll from '../utils/relayUnsubscribeAll'
@@ -18,7 +18,7 @@ mutation DisconnectSocket($userId: ID!) {
   }
 }`
 
-const handleDisconnect = (connectionContext: ConnectionContext, options: Options = {}) => {
+const handleDisconnect = async (connectionContext: ConnectionContext, options: Options = {}) => {
   const {exitCode = 1000, reason} = options
   const {authToken, ip, cancelKeepAlive, id: socketId, socket, isDisconnecting} = connectionContext
   if (isDisconnecting) return
@@ -28,11 +28,9 @@ const handleDisconnect = (connectionContext: ConnectionContext, options: Options
   relayUnsubscribeAll(connectionContext)
   if (authToken.rol !== 'impersonate') {
     const userId = getUserId(authToken)
-    publishInternalGQL({authToken, ip, query: disconnectQuery, socketId, variables: {userId}})
+    await publishInternalGQL({authToken, ip, query: disconnectQuery, socketId, variables: {userId}})
   }
-  if (connectionContext.id.startsWith('sse')) {
-    sseClients.delete(connectionContext.id)
-  }
+  activeClients.delete(connectionContext.id)
   closeTransport(socket, exitCode, reason)
 }
 

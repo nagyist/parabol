@@ -1,13 +1,13 @@
+import styled from '@emotion/styled'
+import {Lock} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
+import {useEffect} from 'react'
 import {useFragment} from 'react-relay'
 import {NewMeetingSettingsUpgradeForTeamHealth_team$key} from '~/__generated__/NewMeetingSettingsUpgradeForTeamHealth_team.graphql'
-import PlainButton from './PlainButton/PlainButton'
-import {Lock} from '@mui/icons-material'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
 import useAtmosphere from '../hooks/useAtmosphere'
-import styled from '@emotion/styled'
 import {PALETTE} from '../styles/paletteV3'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
+import PlainButton from './PlainButton/PlainButton'
 
 const ButtonRow = styled(PlainButton)({
   background: PALETTE.SLATE_200,
@@ -45,8 +45,8 @@ const NewMeetingSettingsToggleTeamHealth = (props: Props) => {
   const {orgId} = team
   const atmosphere = useAtmosphere()
 
-  React.useEffect(() => {
-    SendClientSegmentEventMutation(atmosphere, 'Upgrade CTA Viewed', {
+  useEffect(() => {
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Viewed', {
       upgradeCTALocation: 'meetingSettingsTeamHealth',
       meetingType: 'retrospective',
       orgId
@@ -54,7 +54,7 @@ const NewMeetingSettingsToggleTeamHealth = (props: Props) => {
   }, [])
 
   const handleUpgrade = () => {
-    SendClientSegmentEventMutation(atmosphere, 'Upgrade CTA Clicked', {
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Clicked', {
       upgradeCTALocation: 'meetingSettingsTeamHealth',
       meetingType: 'retrospective',
       orgId

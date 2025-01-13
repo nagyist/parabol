@@ -6,14 +6,14 @@ import {
 } from '~/__generated__/NavigateMeetingMutation_meeting.graphql'
 import {NavigateMeetingMutation_team$data} from '~/__generated__/NavigateMeetingMutation_team.graphql'
 import {ReflectionGroup_reflectionGroup$data} from '~/__generated__/ReflectionGroup_reflectionGroup.graphql'
+import {NavigateMeetingMutation as TNavigateMeetingMutation} from '../__generated__/NavigateMeetingMutation.graphql'
 import {SharedUpdater, SimpleMutation} from '../types/relayMutations'
 import {REFLECT, VOTE} from '../utils/constants'
 import isInterruptingChickenPhase from '../utils/isInterruptingChickenPhase'
 import getBaseRecord from '../utils/relay/getBaseRecord'
 import safeProxy from '../utils/relay/safeProxy'
 import {setLocalStageAndPhase} from '../utils/relay/updateLocalStage'
-import {isViewerTypingInComment, isViewerTypingInTask} from '../utils/viewerTypingUtils'
-import {NavigateMeetingMutation as TNavigateMeetingMutation} from '../__generated__/NavigateMeetingMutation.graphql'
+import {isViewerTyping} from '../utils/viewerTypingUtils'
 import handleRemoveReflectionGroups from './handlers/handleRemoveReflectionGroups'
 
 graphql`
@@ -130,8 +130,11 @@ export const navigateMeetingTeamUpdater: SharedUpdater<NavigateMeetingMutation_t
     const viewerPhaseType = meeting
       .getLinkedRecord('localPhase')!
       .getValue('phaseType') as NewMeetingPhaseTypeEnum
-    const isViewerTyping = isViewerTypingInTask() || isViewerTypingInComment()
-    if (!isInterruptingChickenPhase(viewerPhaseType) || !isViewerTyping) {
+    if (
+      (!isInterruptingChickenPhase(viewerPhaseType) || !isViewerTyping()) &&
+      // if i have spotlight open, i don't want the facilitator to move me around
+      !meeting.getValue('spotlightReflectionId')
+    ) {
       setLocalStageAndPhase(store, meetingId, facilitatorStageId)
     }
   }

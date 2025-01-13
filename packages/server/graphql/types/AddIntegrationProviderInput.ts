@@ -13,19 +13,24 @@ import IntegrationProviderMetadataInputOAuth1, {
 import IntegrationProviderMetadataInputOAuth2, {
   IIntegrationProviderMetadataInputOAuth2
 } from './IntegrationProviderMetadataInputOAuth2'
+import IntegrationProviderMetadataInputSharedSecret, {
+  IIntegrationProviderMetadataInputSharedSecret
+} from './IntegrationProviderMetadataInputSharedSecret'
 import IntegrationProviderMetadataInputWebhook, {
   IIntegrationProviderMetadataInputWebhook
 } from './IntegrationProviderMetadataInputWebhook'
 import IntegrationProviderServiceEnum from './IntegrationProviderServiceEnum'
 
 export interface IAddIntegrationProviderInput {
-  teamId: string
+  teamId: string | null
+  orgId: string | null
   service: TIntegrationProviderServiceEnum
   authStrategy: TIntegrationProviderAuthStrategyEnum
   scope: TIntegrationProviderEditableScopeEnum
   webhookProviderMetadataInput: IIntegrationProviderMetadataInputWebhook | null
   oAuth1ProviderMetadataInput: IIntegrationProviderMetadataInputOAuth1 | null
   oAuth2ProviderMetadataInput: IIntegrationProviderMetadataInputOAuth2 | null
+  sharedSecretMetadataInput: IIntegrationProviderMetadataInputSharedSecret | null
 }
 
 const AddIntegrationProviderInput = new GraphQLInputObjectType({
@@ -33,8 +38,12 @@ const AddIntegrationProviderInput = new GraphQLInputObjectType({
   description: 'An Integration Provider configuration',
   fields: () => ({
     teamId: {
-      type: new GraphQLNonNull(GraphQLID),
+      type: GraphQLID,
       description: 'The team that the token is linked to'
+    },
+    orgId: {
+      type: GraphQLID,
+      description: 'The organization that the token is linked to'
     },
     service: {
       type: new GraphQLNonNull(IntegrationProviderServiceEnum),
@@ -62,6 +71,11 @@ const AddIntegrationProviderInput = new GraphQLInputObjectType({
       type: IntegrationProviderMetadataInputOAuth2,
       description:
         'OAuth2 provider metadata, has to be non-null if token type is OAuth2, refactor once we get https://github.com/graphql/graphql-spec/pull/825'
+    },
+    sharedSecretMetadataInput: {
+      type: IntegrationProviderMetadataInputSharedSecret,
+      description:
+        'Shared secret provider metadata, has to be non-null if token type is shared secret'
     }
   })
 })

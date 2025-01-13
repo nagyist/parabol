@@ -1,15 +1,14 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import Menu from '~/components/Menu'
 import PaletteColor from '~/components/PaletteColor/PaletteColor'
 import UpdatePokerTemplateScaleValueMutation from '~/mutations/UpdatePokerTemplateScaleValueMutation'
 import palettePickerOptions from '~/styles/palettePickerOptions'
+import {ScaleValuePalettePicker_scale$key} from '../../../__generated__/ScaleValuePalettePicker_scale.graphql'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import {MenuProps} from '../../../hooks/useMenu'
 import useMutationProps from '../../../hooks/useMutationProps'
-import {ScaleValuePalettePicker_scale$key} from '../../../__generated__/ScaleValuePalettePicker_scale.graphql'
 
 interface Props {
   scale: ScaleValuePalettePicker_scale$key

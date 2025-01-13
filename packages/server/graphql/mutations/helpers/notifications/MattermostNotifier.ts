@@ -4,15 +4,17 @@ import makeAppURL from 'parabol-client/utils/makeAppURL'
 import findStageById from 'parabol-client/utils/meetings/findStageById'
 import {phaseLabelLookup} from 'parabol-client/utils/meetings/lookups'
 import appOrigin from '../../../../appOrigin'
-import Meeting from '../../../../database/types/Meeting'
-import {SlackNotificationEventEnum as EventEnum} from '../../../../database/types/SlackNotification'
 import {IntegrationProviderMattermost} from '../../../../postgres/queries/getIntegrationProvidersByIds'
-import {Team} from '../../../../postgres/queries/getTeamsByIds'
-import {MeetingTypeEnum} from '../../../../postgres/types/Meeting'
-import {toEpochSeconds} from '../../../../utils/epochTime'
+import {SlackNotification, Team, TeamMemberIntegrationAuth} from '../../../../postgres/types'
+import IUser from '../../../../postgres/types/IUser'
+import {AnyMeeting, MeetingTypeEnum} from '../../../../postgres/types/Meeting'
 import MattermostServerManager from '../../../../utils/MattermostServerManager'
+import {analytics} from '../../../../utils/analytics/analytics'
+import {toEpochSeconds} from '../../../../utils/epochTime'
 import sendToSentry from '../../../../utils/sendToSentry'
 import {DataLoaderWorker} from '../../../graphql'
+import {NotificationIntegrationHelper} from './NotificationIntegrationHelper'
+import {createNotifier} from './Notifier'
 import getSummaryText from './getSummaryText'
 import {
   Field,
@@ -20,33 +22,36 @@ import {
   makeHackedButtonPairFields,
   makeHackedFieldButtonValue
 } from './makeMattermostAttachments'
-import {NotificationIntegrationHelper} from './NotificationIntegrationHelper'
-import {Notifier} from './Notifier'
-import {getTeamPromptResponsesByMeetingId} from '../../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
-import {analytics} from '../../../../utils/analytics/analytics'
 
 const notifyMattermost = async (
-  event: EventEnum,
-  webhookUrl: string,
-  userId: string,
+  event: SlackNotification['event'],
+  channel: {webhookUrl: string | null; serverBaseUrl: string | null; sharedSecret: string | null},
+  user: IUser,
   teamId: string,
   textOrAttachmentsArray: string | unknown[],
   notificationText?: string
 ) => {
-  const manager = new MattermostServerManager(webhookUrl)
+  const {webhookUrl, serverBaseUrl, sharedSecret} = channel
+  const notifyUrl = serverBaseUrl
+    ? `${serverBaseUrl}/plugins/co.parabol.action/notify/${teamId}`
+    : webhookUrl
+  if (!notifyUrl) {
+    return 'success'
+  }
+  const manager = new MattermostServerManager(notifyUrl, sharedSecret ?? undefined)
   const result = await manager.postMessage(textOrAttachmentsArray, notificationText)
   if (result instanceof Error) {
-    sendToSentry(result, {userId, tags: {teamId, event, webhookUrl}})
+    sendToSentry(result, {userId: user.id, tags: {teamId, event, notifyUrl}})
     return {
       error: result
     }
   }
-  analytics.mattermostNotificationSent(userId, teamId, event)
+  analytics.mattermostNotificationSent(user, teamId, event)
 
   return 'success'
 }
 
-const makeEndMeetingButtons = (meeting: Meeting) => {
+const makeEndMeetingButtons = (meeting: AnyMeeting) => {
   const {id: meetingId} = meeting
   const searchParams = {
     utm_source: 'mattermost summary',
@@ -89,11 +94,18 @@ const makeEndMeetingButtons = (meeting: Meeting) => {
   }
 }
 
-type MattermostNotificationAuth = IntegrationProviderMattermost & {userId: string}
+type MattermostNotificationAuth = {
+  userId: string
+  teamId: string
+  channel: string | null
+  webhookUrl: string | null
+  serverBaseUrl: string | null
+  sharedSecret: string | null
+}
 
 const makeTeamPromptStartMeetingNotification = (
   team: Team,
-  meeting: Meeting,
+  meeting: AnyMeeting,
   meetingUrl: string
 ) => {
   return [
@@ -118,7 +130,11 @@ const makeTeamPromptStartMeetingNotification = (
   ]
 }
 
-const makeGenericStartMeetingNotification = (team: Team, meeting: Meeting, meetingUrl: string) => {
+const makeGenericStartMeetingNotification = (
+  team: Team,
+  meeting: AnyMeeting,
+  meetingUrl: string
+) => {
   return [
     makeFieldsAttachment(
       [
@@ -148,7 +164,7 @@ const makeGenericStartMeetingNotification = (team: Team, meeting: Meeting, meeti
 
 const makeStartMeetingNotificationLookup: Record<
   MeetingTypeEnum,
-  (team: Team, meeting: Meeting, meetingUrl: string) => ReturnType<typeof makeFieldsAttachment>[]
+  (team: Team, meeting: AnyMeeting, meetingUrl: string) => ReturnType<typeof makeFieldsAttachment>[]
 > = {
   teamPrompt: makeTeamPromptStartMeetingNotification,
   action: makeGenericStartMeetingNotification,
@@ -159,10 +175,7 @@ const makeStartMeetingNotificationLookup: Record<
 const MattermostNotificationHelper: NotificationIntegrationHelper<MattermostNotificationAuth> = (
   notificationChannel
 ) => ({
-  async startMeeting(meeting, team) {
-    const {facilitatorUserId} = meeting
-    const {webhookUrl} = notificationChannel
-
+  async startMeeting(meeting, team, user) {
     const searchParams = {
       utm_source: 'mattermost meeting start',
       utm_medium: 'product',
@@ -170,18 +183,17 @@ const MattermostNotificationHelper: NotificationIntegrationHelper<MattermostNoti
     }
     const options = {searchParams}
     const meetingUrl = makeAppURL(appOrigin, `meet/${meeting.id}`, options)
-    const notification = makeStartMeetingNotificationLookup[meeting.meetingType](
+    const notification = makeStartMeetingNotificationLookup[meeting.meetingType]!(
       team,
       meeting,
       meetingUrl
     )
 
-    return notifyMattermost('meetingStart', webhookUrl, facilitatorUserId, team.id, notification)
+    return notifyMattermost('meetingStart', notificationChannel, user, team.id, notification)
   },
 
-  async endMeeting(meeting, team) {
-    const {facilitatorUserId, summary} = meeting
-    const {webhookUrl} = notificationChannel
+  async endMeeting(meeting, team, user) {
+    const {summary} = meeting
 
     const summaryText = await getSummaryText(meeting)
     const meetingUrl = makeAppURL(appOrigin, `meet/${meeting.id}`)
@@ -217,12 +229,11 @@ const MattermostNotificationHelper: NotificationIntegrationHelper<MattermostNoti
         title_link: meetingUrl
       })
     ]
-    return notifyMattermost('meetingEnd', webhookUrl, facilitatorUserId, team.id, attachments)
+    return notifyMattermost('meetingEnd', notificationChannel, user, team.id, attachments)
   },
 
-  async startTimeLimit(scheduledEndTime, meeting, team) {
-    const {name: meetingName, phases, facilitatorStageId, facilitatorUserId} = meeting
-    const {webhookUrl} = notificationChannel
+  async startTimeLimit(scheduledEndTime, meeting, team, user) {
+    const {name: meetingName, phases, facilitatorStageId} = meeting
 
     const {name: teamName} = team
     const stageRes = findStageById(phases, facilitatorStageId)
@@ -271,30 +282,54 @@ const MattermostNotificationHelper: NotificationIntegrationHelper<MattermostNoti
 
     return notifyMattermost(
       'MEETING_STAGE_TIME_LIMIT_START',
-      webhookUrl,
-      facilitatorUserId,
+      notificationChannel,
+      user,
       team.id,
       attachments
     )
   },
-  async endTimeLimit(meeting, team) {
-    const {facilitatorUserId: userId} = meeting
-    const {webhookUrl} = notificationChannel
-
+  async endTimeLimit(meeting, team, user) {
+    const {name: meetingName} = meeting
+    const {name: teamName} = team
     const meetingUrl = makeAppURL(appOrigin, `meet/${meeting.id}`)
-    const messageText = `Time’s up! Advance your meeting to the next phase: ${meetingUrl}`
+
+    const attachments = [
+      makeFieldsAttachment(
+        [
+          {
+            short: true,
+            title: 'Team',
+            value: teamName
+          },
+          {
+            short: true,
+            title: 'Meeting',
+            value: meetingName
+          },
+          {
+            short: false,
+            value: makeHackedFieldButtonValue({label: 'Open meeting', link: meetingUrl})
+          }
+        ],
+        {
+          fallback: `Time’s up! Advance your meeting to the next phase: ${meetingUrl}`,
+          title: `Time’s up! Advance your meeting to the next phase ⏰`,
+          title_link: meetingUrl
+        }
+      )
+    ]
 
     return notifyMattermost(
       'MEETING_STAGE_TIME_LIMIT_END',
-      webhookUrl,
+      notificationChannel,
+      user,
       team.id,
-      userId,
-      messageText
+      attachments
     )
   },
-  async integrationUpdated() {
+  async integrationUpdated(user) {
     const message = `Integration webhook configuration updated`
-    const {webhookUrl, teamId, userId} = notificationChannel
+    const {teamId} = notificationChannel
 
     const attachments = [
       makeFieldsAttachment(
@@ -309,7 +344,7 @@ const MattermostNotificationHelper: NotificationIntegrationHelper<MattermostNoti
         }
       )
     ]
-    return notifyMattermost('meetingEnd', webhookUrl, userId, teamId, attachments)
+    return notifyMattermost('meetingEnd', notificationChannel, user, teamId, attachments)
   },
   async standupResponseSubmitted() {
     // Not implemented
@@ -318,94 +353,50 @@ const MattermostNotificationHelper: NotificationIntegrationHelper<MattermostNoti
 })
 
 async function getMattermost(dataLoader: DataLoaderWorker, teamId: string, userId: string) {
-  const provider = await dataLoader
-    .get('bestTeamIntegrationProviders')
-    .load({service: 'mattermost', teamId, userId})
-  return provider
-    ? MattermostNotificationHelper({
-        ...(provider as IntegrationProviderMattermost),
-        userId
+  if (process.env.MATTERMOST_SECRET && process.env.MATTERMOST_URL) {
+    return [
+      MattermostNotificationHelper({
+        userId,
+        teamId,
+        serverBaseUrl: process.env.MATTERMOST_URL,
+        sharedSecret: process.env.MATTERMOST_SECRET,
+        channel: null,
+        webhookUrl: null
       })
-    : null
-}
-
-async function loadMeetingTeam(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-  const [team, meeting] = await Promise.all([
-    dataLoader.get('teams').load(teamId),
-    dataLoader.get('newMeetings').load(meetingId)
-  ])
-  return {
-    meeting,
-    team
+    ]
   }
-}
 
-export const MattermostNotifier: Notifier = {
-  async startMeeting(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    ;(await getMattermost(dataLoader, team.id, meeting.facilitatorUserId))?.startMeeting(
-      meeting,
-      team
-    )
-  },
+  const auths = await dataLoader
+    .get('teamMemberIntegrationAuthsByTeamId')
+    .load({service: 'mattermost', teamId})
 
-  async endMeeting(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    ;(await getMattermost(dataLoader, team.id, meeting.facilitatorUserId))?.endMeeting(
-      meeting,
-      team,
-      null
-    )
-  },
-
-  async startTimeLimit(
-    dataLoader: DataLoaderWorker,
-    scheduledEndTime: Date,
-    meetingId: string,
-    teamId: string
-  ) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    ;(await getMattermost(dataLoader, team.id, meeting.facilitatorUserId))?.startTimeLimit(
-      scheduledEndTime,
-      meeting,
-      team
-    )
-  },
-
-  async endTimeLimit(dataLoader: DataLoaderWorker, meetingId: string, teamId: string) {
-    const {meeting, team} = await loadMeetingTeam(dataLoader, meetingId, teamId)
-    if (!meeting || !team) return
-    ;(await getMattermost(dataLoader, team.id, meeting.facilitatorUserId))?.endTimeLimit(
-      meeting,
-      team
-    )
-  },
-
-  async integrationUpdated(dataLoader: DataLoaderWorker, teamId: string, userId: string) {
-    ;(await getMattermost(dataLoader, teamId, userId))?.integrationUpdated()
-  },
-
-  async standupResponseSubmitted(
-    dataLoader: DataLoaderWorker,
-    meetingId: string,
-    teamId: string,
-    userId: string
-  ) {
-    const [{meeting, team}, user, responses] = await Promise.all([
-      loadMeetingTeam(dataLoader, meetingId, teamId),
-      dataLoader.get('users').load(userId),
-      getTeamPromptResponsesByMeetingId(meetingId)
-    ])
-    const response = responses.find(({userId: responseUserId}) => responseUserId === userId)
-    if (!meeting || !team || !response || !user) return
-    ;(await getMattermost(dataLoader, teamId, userId))?.standupResponseSubmitted(
-      meeting,
-      team,
-      user,
-      response
-    )
+  // filter the auths
+  // for webhook, keep only 1 as we don't know the channel
+  // if there are sharedSecret integrations, prefer these, but keep channels unique
+  const filteredAuths = auths.reduce((acc, auth) => {
+    if (auth.channel) {
+      if (!acc.some((a) => a.channel === auth.channel)) {
+        acc.push(auth)
+      }
+    }
+    return acc
+  }, [] as TeamMemberIntegrationAuth[])
+  if (filteredAuths.length === 0) {
+    const webhookAuth =
+      auths.find((auth) => auth.userId === userId) ?? auths.filter((auth) => !auth.channel)[0]
+    if (webhookAuth) {
+      filteredAuths.push(webhookAuth)
+    }
   }
+
+  return Promise.all(
+    filteredAuths.map(async (auth) => {
+      const provider = (await dataLoader
+        .get('integrationProviders')
+        .loadNonNull(auth.providerId)) as IntegrationProviderMattermost
+      return MattermostNotificationHelper({...provider, teamId, userId, channel: auth.channel})
+    })
+  )
 }
+
+export const MattermostNotifier = createNotifier(getMattermost)

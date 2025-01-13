@@ -1,15 +1,13 @@
-import {PALETTE} from '~/styles/paletteV3'
 import {SlackNotificationEventEnum} from '~/__generated__/SlackNotificationList_viewer.graphql'
-import RetrospectiveMeeting from '../../../server/database/types/MeetingRetrospective'
-import RetrospectiveMeetingSettings from '../../../server/database/types/MeetingSettingsRetrospective'
-import ITask from '../../../server/database/types/Task'
+import {PALETTE} from '~/styles/paletteV3'
+import {Task as ITask} from '../../../server/postgres/types/index.d'
+import {RetrospectiveMeeting} from '../../../server/postgres/types/Meeting'
 import JiraProjectId from '../../shared/gqlIds/JiraProjectId'
 import demoUserAvatar from '../../styles/theme/images/avatar-user.svg'
 import {ExternalLinks, MeetingSettingsThreshold, RetroDemo} from '../../types/constEnums'
 import {DISCUSS, GROUP, REFLECT, RETROSPECTIVE, VOTE} from '../../utils/constants'
 import getDemoAvatar from '../../utils/getDemoAvatar'
 import toTeamMemberId from '../../utils/relay/toTeamMemberId'
-import normalizeRawDraftJS from '../../validation/normalizeRawDraftJS'
 import {DemoReflection, DemoReflectionGroup, DemoTask} from './ClientGraphQLServer'
 import DemoDiscussStage from './DemoDiscussStage'
 import DemoGenericMeetingStage from './DemoGenericMeetingStage'
@@ -35,7 +33,7 @@ type IRetrospectiveMeeting = Omit<
   votesRemaining: number
 }
 
-type IRetrospectiveMeetingSettings = RetrospectiveMeetingSettings & {
+type IRetrospectiveMeetingSettings = {
   team: any
 }
 
@@ -293,18 +291,17 @@ const initDemoOrg = () => {
     id: demoOrgId,
     name: 'Demo Organization',
     tier: 'team',
+    billingTier: 'team',
     orgUserCount: {
       activeUserCount: 5,
       inactiveUserCount: 0
     },
-    featureFlags: {
-      zoomTranscription: false,
-      suggestGroups: false,
-      teamsLimit: false,
-      noPromptToJoinOrg: false,
-      AIGeneratedDiscussionPrompt: false
-    },
-    showConversionModal: false
+    hasSuggestGroupsFlag: false,
+    hasZoomFlag: false,
+    tierLimitExceededAt: null,
+    showConversionModal: false,
+    useAI: true
+    // viewerOrganizationUser
   } as const
 }
 
@@ -325,6 +322,7 @@ const initDemoTeam = (
     teamName: demoTeamName,
     orgId: demoOrgId,
     tier: 'team',
+    billingTier: 'team',
     teamId: demoTeamId,
     organization,
     meetingSettings: initMeetingSettings(),
@@ -439,7 +437,7 @@ export class DemoComment {
     },
     db: RetroDemoDB
   ) {
-    this.content = normalizeRawDraftJS(content)
+    this.content = content
     this.createdAt = new Date().toJSON()
     this.updatedAt = new Date().toJSON()
     this.createdBy = isAnonymous ? null : userId
@@ -481,6 +479,10 @@ export class DemoDiscussion {
   id: string
   thread = new DemoDiscussionThread()
   commentCount = 0
+  team = {
+    id: demoTeamId,
+    organization: initDemoOrg()
+  }
   constructor(reflectionGroupId: string) {
     this.createdAt = new Date().toJSON()
     this.id = `discussion:${reflectionGroupId}`
@@ -501,6 +503,8 @@ const initNewMeeting = (
     __isNewMeeting: 'RetrospectiveMeeting',
     createdAt: now,
     createdBy: demoViewerId,
+    createdByUser: viewerMeetingMember?.user,
+    disableAnonymity: false,
     endedAt: null,
     facilitatorStageId: RetroDemo.REFLECT_STAGE_ID,
     facilitatorUserId: demoViewerId,
@@ -521,9 +525,13 @@ const initNewMeeting = (
     votesRemaining: teamMembers.length * 5,
     phases: initPhases() as any[],
     summarySentAt: null,
+    summary: `The team are feeling the strain of too many meetings and over-packed sprints, which is stifling creativity, especially for the interns and junior staff. Clarifying processes, reducing unproductive group chats, and giving everyone more space to share ideas should help.`,
     totalVotes: MeetingSettingsThreshold.RETROSPECTIVE_TOTAL_VOTES_DEFAULT,
     maxVotesPerGroup: MeetingSettingsThreshold.RETROSPECTIVE_MAX_VOTES_PER_GROUP_DEFAULT,
-    teamId: demoTeamId
+    teamId: demoTeamId,
+    videoMeetingURL: null,
+    transcription: null,
+    locked: false
   } as Partial<IRetrospectiveMeeting>
 }
 
@@ -560,6 +568,9 @@ const initDB = (botScript: ReturnType<typeof initBotScript>) => {
   const team = initDemoTeam(org, teamMembers, newMeeting)
   teamMembers.forEach((teamMember) => {
     ;(teamMember as any).team = team
+  })
+  users.forEach((user) => {
+    ;(user as any).teams = [team]
   })
   team.meetingSettings.team = team as any
   newMeeting.commentCount = 0

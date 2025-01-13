@@ -1,19 +1,18 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {PreloadedQuery, usePreloadedQuery} from 'react-relay'
+import {ProviderListQuery} from '../../../../__generated__/ProviderListQuery.graphql'
 import SettingsWrapper from '../../../../components/Settings/SettingsWrapper'
 import {PALETTE} from '../../../../styles/paletteV3'
-import {ProviderListQuery} from '../../../../__generated__/ProviderListQuery.graphql'
 import AtlassianProviderRow from '../ProviderRow/AtlassianProviderRow'
 import AzureDevOpsProviderRow from '../ProviderRow/AzureDevOpsProviderRow'
+import GcalProviderRow from '../ProviderRow/GcalProviderRow'
 import GitHubProviderRow from '../ProviderRow/GitHubProviderRow'
 import GitLabProviderRow from '../ProviderRow/GitLabProviderRow'
 import JiraServerProviderRow from '../ProviderRow/JiraServerProviderRow'
-import MattermostProviderRow from '../ProviderRow/MattermostProviderRow'
 import MSTeamsProviderRow from '../ProviderRow/MSTeamsProviderRow'
+import MattermostProviderRow from '../ProviderRow/MattermostProviderRow'
 import SlackProviderRow from '../ProviderRow/SlackProviderRow'
-import GcalProviderRow from '../ProviderRow/GcalProviderRow'
 
 interface Props {
   queryRef: PreloadedQuery<ProviderListQuery>
@@ -107,11 +106,6 @@ const query = graphql`
           }
         }
       }
-      featureFlags {
-        azureDevOps
-        msTeams
-        gcal
-      }
     }
   }
 `
@@ -120,71 +114,66 @@ const ProviderList = (props: Props) => {
   const {queryRef, retry, teamId} = props
   const data = usePreloadedQuery<ProviderListQuery>(query, queryRef)
   const {viewer} = data
-  const {
-    featureFlags: {azureDevOps: allowAzureDevOps, msTeams: allowMSTeams, gcal: allowGcal}
-  } = viewer
-
   const integrations = viewer.teamMember?.integrations
 
   const allIntegrations = [
     {
       name: 'Atlassian',
       connected: !!integrations?.atlassian?.accessToken,
-      component: <AtlassianProviderRow teamId={teamId} retry={retry} viewer={viewer} />
+      component: (
+        <AtlassianProviderRow key='atlassian' teamId={teamId} retry={retry} viewer={viewer} />
+      )
     },
     {
-      name: 'Jira Server',
+      name: 'Jira Data Center',
       connected:
         !!integrations?.jiraServer?.auth?.isActive && integrations.jiraServer?.sharedProviders[0],
-      component: <JiraServerProviderRow teamId={teamId} viewerRef={viewer} />
+      component: <JiraServerProviderRow key='jira' teamId={teamId} viewerRef={viewer} />
     },
     {
       name: 'GitHub',
       connected: !!integrations?.github?.accessToken,
-      component: <GitHubProviderRow teamId={teamId} viewer={viewer} />
+      component: <GitHubProviderRow key='github' teamId={teamId} viewer={viewer} />
     },
     {
       name: 'GitLab',
       connected: !!integrations?.gitlab.auth,
-      component: <GitLabProviderRow teamId={teamId} viewerRef={viewer} />
+      component: <GitLabProviderRow key='gitlab' teamId={teamId} viewerRef={viewer} />
     },
     {
       name: 'Mattermost',
       connected: !!integrations?.mattermost.auth,
-      component: <MattermostProviderRow teamId={teamId} viewerRef={viewer} />
+      component: <MattermostProviderRow key='mm' teamId={teamId} viewerRef={viewer} />
     },
     {
       name: 'Slack',
       connected: integrations?.slack?.isActive,
-      component: <SlackProviderRow teamId={teamId} viewer={viewer} />
+      component: <SlackProviderRow key='slack' teamId={teamId} viewer={viewer} />
     },
     {
       name: 'Azure DevOps',
       connected: !!integrations?.azureDevOps.auth?.accessToken,
-      component: <AzureDevOpsProviderRow teamId={teamId} viewerRef={viewer} />,
-      hidden: !allowAzureDevOps
+      component: <AzureDevOpsProviderRow key='azure' teamId={teamId} viewerRef={viewer} />
     },
     {
       name: 'MS Teams',
       connected: !!integrations?.msTeams.auth,
-      component: <MSTeamsProviderRow teamId={teamId} viewerRef={viewer} />,
-      hidden: !allowMSTeams
+      component: <MSTeamsProviderRow key='teams' teamId={teamId} viewerRef={viewer} />
     },
     {
       name: 'Gcal Integration',
       connected: !!integrations?.gcal?.auth,
-      component: <GcalProviderRow viewerRef={viewer} teamId={teamId} />,
-      hidden: !allowGcal
+      component: <GcalProviderRow key='gcal' viewerRef={viewer} teamId={teamId} />
     }
   ]
 
   const connectedIntegrations = allIntegrations
-    .filter((integration) => integration.connected && !integration.hidden)
+    .filter((integration) => integration.connected)
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((integration) => integration.component)
 
   const availableIntegrations = allIntegrations
-    .filter((integration) => !integration.connected && !integration.hidden)
+    .filter((integration) => !integration.connected)
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((integration) => integration.component)
 

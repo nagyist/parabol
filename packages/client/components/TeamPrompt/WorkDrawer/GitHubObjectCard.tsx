@@ -1,19 +1,20 @@
-import React from 'react'
+import {Link} from '@mui/icons-material'
+import graphql from 'babel-plugin-relay/macro'
 import CopyToClipboard from 'react-copy-to-clipboard'
+import {useFragment} from 'react-relay'
+import {GitHubObjectCard_result$key} from '../../../__generated__/GitHubObjectCard_result.graphql'
+import useAtmosphere from '../../../hooks/useAtmosphere'
+import {MenuPosition} from '../../../hooks/useCoords'
+import useTooltip from '../../../hooks/useTooltip'
 import gitHubSVG from '../../../styles/theme/images/graphics/github-circle.svg'
-import gitHubMerged from '../../../styles/theme/images/graphics/github-merged.svg'
 import githubIssueClosed from '../../../styles/theme/images/graphics/github-issue-closed.svg'
 import githubIssueOpen from '../../../styles/theme/images/graphics/github-issue-open.svg'
-import githubPROpen from '../../../styles/theme/images/graphics/github-pr-open.svg'
-import githubPRDraft from '../../../styles/theme/images/graphics/github-pr-draft.svg'
+import gitHubMerged from '../../../styles/theme/images/graphics/github-merged.svg'
 import githubPRClosed from '../../../styles/theme/images/graphics/github-pr-closed.svg'
+import githubPRDraft from '../../../styles/theme/images/graphics/github-pr-draft.svg'
+import githubPROpen from '../../../styles/theme/images/graphics/github-pr-open.svg'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
 import relativeDate from '../../../utils/date/relativeDate'
-import {Link} from '@mui/icons-material'
-import useTooltip from '../../../hooks/useTooltip'
-import {MenuPosition} from '../../../hooks/useCoords'
-import {useFragment} from 'react-relay'
-import graphql from 'babel-plugin-relay/macro'
-import {GitHubObjectCard_result$key} from '../../../__generated__/GitHubObjectCard_result.graphql'
 import {mergeRefs} from '../../../utils/react/mergeRefs'
 
 const ISSUE_STATUS_MAP: Record<string, any> = {
@@ -73,6 +74,8 @@ const GitHubObjectCard = (props: Props) => {
     resultRef
   )
 
+  const atmosphere = useAtmosphere()
+
   const {tooltipPortal, openTooltip, closeTooltip, originRef} = useTooltip<HTMLDivElement>(
     MenuPosition.UPPER_CENTER
   )
@@ -84,8 +87,21 @@ const GitHubObjectCard = (props: Props) => {
     originRef: copiedTooltipRef
   } = useTooltip<HTMLDivElement>(MenuPosition.LOWER_CENTER)
 
+  const trackLinkClick = () => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Card Link Clicked', {
+      service: 'github'
+    })
+  }
+
+  const trackCopy = () => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Card Copied', {
+      service: 'github'
+    })
+  }
+
   const handleCopy = () => {
     openCopiedTooltip()
+    trackCopy()
     setTimeout(() => {
       closeCopiedTooltip()
     }, 2000)
@@ -112,13 +128,25 @@ const GitHubObjectCard = (props: Props) => {
     <div className='rounded border border-solid border-slate-300 p-4 hover:border-slate-600'>
       <div className='flex gap-2 text-xs text-slate-600'>
         {statusImg && <img src={statusImg} />}
-        <a href={url} target='_blank' className='font-medium hover:underline' rel='noreferrer'>
+        <a
+          href={url}
+          target='_blank'
+          className='font-medium hover:underline'
+          rel='noreferrer'
+          onClick={trackLinkClick}
+        >
           #{number}
         </a>
         <div>Updated {relativeDate(updatedAt)}</div>
       </div>
       <div className='my-2 text-sm'>
-        <a href={url} target='_blank' className='hover:underline' rel='noreferrer'>
+        <a
+          href={url}
+          target='_blank'
+          className='hover:underline'
+          rel='noreferrer'
+          onClick={trackLinkClick}
+        >
           {title}
         </a>
       </div>
@@ -132,6 +160,7 @@ const GitHubObjectCard = (props: Props) => {
             target='_blank'
             className='text-xs text-slate-600 hover:underline'
             rel='noreferrer'
+            onClick={trackLinkClick}
           >
             {repoName}
           </a>

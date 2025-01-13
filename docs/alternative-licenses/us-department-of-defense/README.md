@@ -1,8 +1,6 @@
 # Parabol Hardened Container for Platform One Iron Bank
 
 [![Slack Status](https://slackin.parabol.co/badge.svg)](https://slackin.parabol.co/)
-[![CircleCI](https://circleci.com/gh/ParabolInc/parabol.svg?style=svg)](https://circleci.com/gh/ParabolInc/parabol)
-[![StackShare](https://img.shields.io/badge/tech-stack-0690fa.svg?style=flat)](https://stackshare.io/parabol-inc/parabol-multiplayer-web-app)
 
 ## Overview
 
@@ -32,7 +30,6 @@ For all matters, please contact: support@parabol.co
 | ---------------------- | -------------------------------------------------------------- |
 | Server                 | [Node](https://nodejs.org/)                                    |
 | Server Framework       | [uWebSockts.js](https://github.com/uNetworking/uWebSockets.js) |
-| Database (Legacy)      | [RethinkDB](https://www.rethinkdb.com/)                        |
 | Database               | [PostgreSQL](https://www.postgresql.org/)                      |
 | PubSub & Cache         | [Redis](https://redis.io)                                      |
 | Data Transport         | [GraphQL](https://github.com/graphql/graphql-js)               |
@@ -72,11 +69,6 @@ Build for production and start application:
 $ yarn && yarn build && yarn start
 ```
 
-### RethinkDB
-
-- Migrations are stored in `packages/server/database/migrations`
-- RethinkDB Dashboard is at [http://localhost:8080](http://localhost:8080)
-
 ### PostgreSQL
 
 - pgadmin is at [http://localhost:5050](http://localhost:5050)
@@ -84,7 +76,7 @@ $ yarn && yarn build && yarn start
 - Click "Add New Server" and fill out the forms with your `.env` values
 
   - General.name = POSTGRES_DB
-  - Connection.host = 'postgres' (hardcoded from docker-compose dev.yml, not from .env!)
+  - Connection.host = 'postgres' (hardcoded from docker-compose `docker/stacks/development/docker-compose.yml`, not from .env!)
   - Connection.username = POSTGRES_USER
   - Connection.password = POSTGRES_PASSWORD
   - Connection.maintenanceDatabase = POSTGRES_DB

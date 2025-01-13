@@ -21,15 +21,16 @@ const useServiceWorkerUpdater = () => {
         action: {
           label: `See what's changed`,
           callback: () => {
-            const url =
-              'https://github.com/ParabolInc/parabol/blob/production/CHANGELOG.md#parabol-change-log'
+            const url = `https://github.com/ParabolInc/parabol/releases/tag/v${__APP_VERSION__}`
             window.open(url, '_blank', 'noopener')?.focus()
           }
         }
       })
     }
     if ('serviceWorker' in navigator) {
-      setFirstServiceWorker().catch()
+      setFirstServiceWorker().catch(() => {
+        /*ignore*/
+      })
       navigator.serviceWorker.addEventListener('controllerchange', onServiceWorkerChange)
       return () => {
         navigator.serviceWorker.removeEventListener('controllerchange', onServiceWorkerChange)

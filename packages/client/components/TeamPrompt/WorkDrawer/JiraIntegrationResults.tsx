@@ -1,20 +1,21 @@
-import React from 'react'
 import graphql from 'babel-plugin-relay/macro'
 import {PreloadedQuery, usePaginationFragment, usePreloadedQuery} from 'react-relay'
+import {Link} from 'react-router-dom'
+import halloweenRetrospectiveTemplate from '../../../../../static/images/illustrations/halloweenRetrospectiveTemplate.png'
 import {JiraIntegrationResultsQuery} from '../../../__generated__/JiraIntegrationResultsQuery.graphql'
 import {JiraIntegrationResultsSearchPaginationQuery} from '../../../__generated__/JiraIntegrationResultsSearchPaginationQuery.graphql'
 import {JiraIntegrationResults_search$key} from '../../../__generated__/JiraIntegrationResults_search.graphql'
-import halloweenRetrospectiveTemplate from '../../../../../static/images/illustrations/halloweenRetrospectiveTemplate.png'
-import JiraObjectCard from './JiraObjectCard'
 import useLoadNextOnScrollBottom from '../../../hooks/useLoadNextOnScrollBottom'
 import Ellipsis from '../../Ellipsis/Ellipsis'
+import JiraObjectCard from './JiraObjectCard'
 
 interface Props {
   queryRef: PreloadedQuery<JiraIntegrationResultsQuery>
+  teamId: string
 }
 
 const JiraIntegrationResults = (props: Props) => {
-  const {queryRef} = props
+  const {queryRef, teamId} = props
   const query = usePreloadedQuery(
     graphql`
       query JiraIntegrationResultsQuery($teamId: ID!) {
@@ -91,11 +92,17 @@ const JiraIntegrationResults = (props: Props) => {
             <div className='mt-7 w-2/3 text-center'>
               {error?.message ? error.message : `Looks like you don’t have any issues to display.`}
             </div>
+            <Link
+              to={`/team/${teamId}/integrations`}
+              className='mt-4 font-semibold text-sky-500 hover:text-sky-400'
+            >
+              Review your Jira configuration
+            </Link>
           </div>
         )}
         {lastItem}
         {hasNext && (
-          <div className='mx-auto mb-4 -mt-4 h-8 text-2xl' key={'loadingNext'}>
+          <div className='mx-auto -mt-4 mb-4 h-8 text-2xl' key={'loadingNext'}>
             <Ellipsis />
           </div>
         )}

@@ -1,26 +1,26 @@
 import {ClassNames} from '@emotion/core'
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
+import {useEffect} from 'react'
 import {useFragment} from 'react-relay'
-import {useRouteMatch} from 'react-router'
+import {useLocation} from 'react-router'
 import {NavLink} from 'react-router-dom'
+import DashSectionHeader from '~/components/Dashboard/DashSectionHeader'
 import DashboardAvatars from '~/components/DashboardAvatars/DashboardAvatars'
+import InviteTeamMemberAvatar from '~/components/InviteTeamMemberAvatar'
+import Tab from '~/components/Tab/Tab'
+import Tabs from '~/components/Tabs/Tabs'
+import useRouter from '~/hooks/useRouter'
 import AgendaToggle from '~/modules/teamDashboard/components/AgendaToggle/AgendaToggle'
+import {PALETTE} from '~/styles/paletteV3'
+import {Breakpoint} from '~/types/constEnums'
 import makeMinWidthMediaQuery from '~/utils/makeMinWidthMediaQuery'
-import DashSectionHeader from '../../../../components/Dashboard/DashSectionHeader'
-import InviteTeamMemberAvatar from '../../../../components/InviteTeamMemberAvatar'
-import Tab from '../../../../components/Tab/Tab'
-import Tabs from '../../../../components/Tabs/Tabs'
-import useRouter from '../../../../hooks/useRouter'
-import {PALETTE} from '../../../../styles/paletteV3'
-import {Breakpoint} from '../../../../types/constEnums'
 import {TeamDashHeader_team$key} from '../../../../__generated__/TeamDashHeader_team.graphql'
 
 const desktopBreakpoint = makeMinWidthMediaQuery(Breakpoint.SIDEBAR_LEFT)
 
 const TeamMeta = styled('div')({
-  // define
+  // Add your styles here
 })
 
 const TeamLinks = styled('div')({
@@ -66,6 +66,7 @@ const secondLink = {
   marginRight: 0,
   marginLeft: 8
 }
+
 const TeamHeaderAndAvatars = styled('div')({
   flexShrink: 0,
   width: '100%',
@@ -96,9 +97,13 @@ const TeamDashHeader = (props: Props) => {
         ...DashboardAvatars_team
         id
         name
+        hasInsightsFlag: featureFlag(featureName: "insights")
         organization {
           id
           name
+        }
+        viewerTeamMember {
+          isLead
         }
         teamMembers(sortBy: "preferredName") {
           ...InviteTeamMemberAvatar_teamMembers
@@ -110,10 +115,47 @@ const TeamDashHeader = (props: Props) => {
     `,
     teamRef
   )
-  const {organization, id: teamId, name: teamName, teamMembers} = team
+
+  const {
+    organization,
+    id: teamId,
+    name: teamName,
+    teamMembers,
+    viewerTeamMember,
+    hasInsightsFlag
+  } = team
   const {name: orgName, id: orgId} = organization
-  const isTasks = useRouteMatch('/team/:teamId/tasks')
+  const canViewInsights = viewerTeamMember?.isLead && hasInsightsFlag
   const {history} = useRouter()
+  const location = useLocation()
+
+  const tabs = [
+    {label: 'Activity', path: 'activity'},
+    {label: 'Tasks', path: 'tasks'},
+    {label: 'Integrations', path: 'integrations'},
+    ...(canViewInsights ? [{label: 'Insights', path: 'insights'}] : [])
+  ]
+
+  const insightsSeenKey = `insightsSeen_${teamId}`
+  const isLocalStorageAvailable = typeof window !== 'undefined' && window.localStorage
+
+  useEffect(() => {
+    if (canViewInsights && isLocalStorageAvailable) {
+      const hasSeenInsights = localStorage.getItem(insightsSeenKey) === 'true'
+      if (!hasSeenInsights) {
+        localStorage.setItem(insightsSeenKey, 'true')
+        history.push(`/team/${teamId}/insights`)
+      }
+    }
+  }, [canViewInsights, insightsSeenKey, isLocalStorageAvailable, history, teamId])
+
+  const activePath = location.pathname.split('/').pop()
+  const activeTab = tabs.find((tab) => tab.path === activePath) ? activePath : 'activity'
+  const activeIdx = tabs.findIndex((tab) => tab.path === activeTab)
+
+  const handleTabClick = (path: string) => {
+    history.push(`/team/${teamId}/${path}`)
+  }
 
   return (
     <DashSectionHeader>
@@ -122,31 +164,27 @@ const TeamDashHeader = (props: Props) => {
           <DashHeading>{teamName}</DashHeading>
           <TeamLinks>
             <ClassNames>
-              {({css}) => {
-                return (
-                  <NavLink
-                    className={css(linkStyles)}
-                    title={orgName}
-                    to={`/me/organizations/${orgId}/billing`}
-                  >
-                    {orgName}
-                  </NavLink>
-                )
-              }}
+              {({css}) => (
+                <NavLink
+                  className={css(linkStyles)}
+                  title={orgName}
+                  to={`/me/organizations/${orgId}/billing`}
+                >
+                  {orgName}
+                </NavLink>
+              )}
             </ClassNames>
             {'•'}
             <ClassNames>
-              {({css}) => {
-                return (
-                  <NavLink
-                    className={css(secondLink)}
-                    title={'Settings & Integrations'}
-                    to={`/team/${teamId}/settings/`}
-                  >
-                    {'Settings & Integrations'}
-                  </NavLink>
-                )
-              }}
+              {({css}) => (
+                <NavLink
+                  className={css(secondLink)}
+                  title={'Settings & Integrations'}
+                  to={`/team/${teamId}/settings/`}
+                >
+                  {'Settings'}
+                </NavLink>
+              )}
             </ClassNames>
           </TeamLinks>
         </TeamMeta>
@@ -157,11 +195,12 @@ const TeamDashHeader = (props: Props) => {
         </Avatars>
       </TeamHeaderAndAvatars>
       <Tabs
-        activeIdx={isTasks ? 1 : 0}
+        activeIdx={activeIdx}
         className='full-w max-w-none border-b border-solid border-slate-300'
       >
-        <Tab label='Activity' onClick={() => history.push(`/team/${teamId}/activity`)} />
-        <Tab label='Tasks' onClick={() => history.push(`/team/${teamId}/tasks`)} />
+        {tabs.map((tab) => (
+          <Tab key={tab.path} label={tab.label} onClick={() => handleTabClick(tab.path)} />
+        ))}
       </Tabs>
     </DashSectionHeader>
   )

@@ -1,14 +1,14 @@
 import {GraphQLBoolean, GraphQLID, GraphQLList, GraphQLNonNull, GraphQLObjectType} from 'graphql'
 import isTaskPrivate from 'parabol-client/utils/isTaskPrivate'
 import {getUserId} from '../../utils/authorization'
-import errorFilter from '../errorFilter'
 import {GQLContext} from '../graphql'
+import isValid from '../isValid'
 import {resolveNewMeeting} from '../resolvers'
 import ActionMeeting from './ActionMeeting'
-import makeMutationPayload from './makeMutationPayload'
 import Task from './Task'
 import Team from './Team'
 import TimelineEvent from './TimelineEvent'
+import makeMutationPayload from './makeMutationPayload'
 
 export const EndCheckInSuccess = new GraphQLObjectType<any, GQLContext>({
   name: 'EndCheckInSuccess',
@@ -37,8 +37,14 @@ export const EndCheckInSuccess = new GraphQLObjectType<any, GQLContext>({
     timelineEvent: {
       type: new GraphQLNonNull(TimelineEvent),
       description: 'An event that is important to the viewer, e.g. an ended meeting',
-      resolve: async ({timelineEventId}, _args: unknown, {dataLoader}) => {
-        return await dataLoader.get('timelineEvents').load(timelineEventId)
+      resolve: async ({meetingId}, _args: unknown, {dataLoader, authToken}) => {
+        const viewerId = getUserId(authToken)
+        const timelineEvents = await dataLoader.get('timelineEventsByMeetingId').load(meetingId)
+        const timelineEvent = timelineEvents.find(
+          (event) => event.type === 'actionComplete' && event.userId === viewerId
+        )
+        if (!timelineEvent) throw new Error('Timeline event not found')
+        return timelineEvent
       }
     },
     updatedTaskIds: {
@@ -51,7 +57,7 @@ export const EndCheckInSuccess = new GraphQLObjectType<any, GQLContext>({
         if (!updatedTaskIds) return []
         const viewerId = getUserId(authToken)
         const allUpdatedTasks = (await dataLoader.get('tasks').loadMany(updatedTaskIds)).filter(
-          errorFilter
+          isValid
         )
         return allUpdatedTasks.filter((task) => {
           return isTaskPrivate(task.tags) ? task.userId === viewerId : true

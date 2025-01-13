@@ -1,13 +1,15 @@
 import styled from '@emotion/styled'
 import {ExpandMore} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {FormEvent, useEffect, useRef, useState} from 'react'
+import {FormEvent, useEffect, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import {MenuPosition} from '~/hooks/useCoords'
 import useMenu from '~/hooks/useMenu'
 import useMutationProps from '~/hooks/useMutationProps'
 import {PALETTE} from '~/styles/paletteV3'
+import {NewJiraIssueInput_meeting$key} from '../__generated__/NewJiraIssueInput_meeting.graphql'
+import {NewJiraIssueInput_viewer$key} from '../__generated__/NewJiraIssueInput_viewer.graphql'
 import useForm from '../hooks/useForm'
 import {PortalStatus} from '../hooks/usePortal'
 import useTimedState from '../hooks/useTimedState'
@@ -15,11 +17,9 @@ import CreateTaskMutation from '../mutations/CreateTaskMutation'
 import UpdatePokerScopeMutation from '../mutations/UpdatePokerScopeMutation'
 import JiraIssueId from '../shared/gqlIds/JiraIssueId'
 import JiraProjectId from '../shared/gqlIds/JiraProjectId'
+import {convertTipTapTaskContent} from '../shared/tiptap/convertTipTapTaskContent'
 import {CompletedHandler} from '../types/relayMutations'
-import convertToTaskContent from '../utils/draftjs/convertToTaskContent'
 import Legitity from '../validation/Legitity'
-import {NewJiraIssueInput_meeting$key} from '../__generated__/NewJiraIssueInput_meeting.graphql'
-import {NewJiraIssueInput_viewer$key} from '../__generated__/NewJiraIssueInput_viewer.graphql'
 import Checkbox from './Checkbox'
 import NewJiraIssueMenu from './NewJiraIssueMenu'
 import PlainButton from './PlainButton/PlainButton'
@@ -199,7 +199,7 @@ const NewJiraIssueInput = (props: Props) => {
       teamId,
       userId,
       meetingId,
-      content: convertToTaskContent(`${newIssueTitle} #archived`),
+      content: convertTipTapTaskContent(newIssueTitle, ['archived']),
       plaintextContent: newIssueTitle,
       status: 'active' as const,
       integration: {

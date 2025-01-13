@@ -1,11 +1,12 @@
+import {JSONContent} from '@tiptap/core'
 import {GraphQLResolveInfo} from 'graphql'
-import {TaskIntegration} from '../database/types/Task'
 import {DataLoaderWorker, GQLContext} from '../graphql/graphql'
 import {IntegrationProviderServiceEnumType} from '../graphql/types/IntegrationProviderServiceEnum'
 import {
   IntegrationProviderAzureDevOps,
   IntegrationProviderJiraServer
 } from '../postgres/queries/getIntegrationProvidersByIds'
+import {Task} from '../postgres/types'
 import AzureDevOpsServerManager from '../utils/AzureDevOpsServerManager'
 import GitHubServerManager from './github/GitHubServerManager'
 import GitLabServerManager from './gitlab/GitLabServerManager'
@@ -18,7 +19,7 @@ export type CreateTaskResponse =
       // TODO: include issueId for GitHub in hash or store integration.issueId for all integrations
       // See https://github.com/ParabolInc/parabol/issues/6252
       issueId: string
-      integration: TaskIntegration
+      integration: NonNullable<Task['integration']>
     }
   | Error
 
@@ -26,7 +27,7 @@ export interface TaskIntegrationManager {
   title: string
 
   createTask(params: {
-    rawContentStr: string
+    rawContentJSON: JSONContent
     integrationRepoId: string
     context?: GQLContext
     info?: GraphQLResolveInfo

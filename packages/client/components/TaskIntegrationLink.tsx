@@ -1,11 +1,11 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {ReactNode} from 'react'
+import {ReactNode} from 'react'
 import {useFragment} from 'react-relay'
 import {parseWebPath} from '~/utils/parseWebPath'
+import {TaskIntegrationLink_integration$key} from '../__generated__/TaskIntegrationLink_integration.graphql'
 import {PALETTE} from '../styles/paletteV3'
 import {Card} from '../types/constEnums'
-import {TaskIntegrationLink_integration$key} from '../__generated__/TaskIntegrationLink_integration.graphql'
 import JiraIssueLink from './JiraIssueLink'
 
 const StyledLink = styled('a')({
@@ -22,14 +22,13 @@ const StyledLink = styled('a')({
 
 interface Props {
   integration: TaskIntegrationLink_integration$key | null
-  dataCy: string
   className?: string
   children?: ReactNode
   showJiraLabelPrefix?: boolean
 }
 
 const TaskIntegrationLink = (props: Props) => {
-  const {integration: integrationRef, dataCy, className, children, showJiraLabelPrefix} = props
+  const {integration: integrationRef, className, children, showJiraLabelPrefix} = props
   const integration = useFragment(
     graphql`
       fragment TaskIntegrationLink_integration on TaskIntegration {
@@ -48,7 +47,6 @@ const TaskIntegrationLink = (props: Props) => {
     const {issueKey, projectKey, cloudName} = integration
     return (
       <JiraIssueLink
-        dataCy={`${dataCy}-jira-issue-link`}
         issueKey={issueKey}
         projectKey={projectKey}
         cloudName={cloudName}
@@ -65,7 +63,7 @@ const TaskIntegrationLink = (props: Props) => {
         href={url}
         rel='noopener noreferrer'
         target='_blank'
-        title={`Jira Server Issue #${issueKey} on ${projectKey}`}
+        title={`Jira Data Center Issue #${issueKey} on ${projectKey}`}
         className={className}
       >
         {`Issue #${issueKey}`}

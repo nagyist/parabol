@@ -1,7 +1,9 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {RefObject, useEffect, useMemo, useRef, useState} from 'react'
+import {RefObject, useEffect, useMemo, useRef, useState} from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
+import {ReflectionGroup_meeting$key} from '../../__generated__/ReflectionGroup_meeting.graphql'
+import {ReflectionGroup_reflectionGroup$key} from '../../__generated__/ReflectionGroup_reflectionGroup.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
 import useEventCallback from '../../hooks/useEventCallback'
 import useExpandedReflections from '../../hooks/useExpandedReflections'
@@ -12,8 +14,6 @@ import {
   Times
 } from '../../types/constEnums'
 import {GROUP} from '../../utils/constants'
-import {ReflectionGroup_meeting$key} from '../../__generated__/ReflectionGroup_meeting.graphql'
-import {ReflectionGroup_reflectionGroup$key} from '../../__generated__/ReflectionGroup_reflectionGroup.graphql'
 import {SwipeColumn} from '../GroupingKanban'
 import {OpenSpotlight} from '../GroupingKanbanColumn'
 import ReflectionGroupHeader from '../ReflectionGroupHeader'
@@ -43,7 +43,7 @@ const Group = styled('div')<{staticReflectionCount: number; isSpotlightSource: b
 
 const ReflectionWrapper = styled('div')<{
   staticIdx: number
-  isDropping: boolean | null
+  isDropping: boolean | null | undefined
   groupCount: number
   isHiddenSpotlightSource: boolean
 }>(({staticIdx, isDropping, groupCount, isHiddenSpotlightSource}) => {

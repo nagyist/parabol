@@ -1,9 +1,10 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {RecordProxy} from 'relay-runtime'
-import onMeetingRoute from '~/utils/onMeetingRoute'
 import {EndRetrospectiveMutation_notification$data} from '~/__generated__/EndRetrospectiveMutation_notification.graphql'
 import {EndRetrospectiveMutation_team$data} from '~/__generated__/EndRetrospectiveMutation_team.graphql'
+import onMeetingRoute from '~/utils/onMeetingRoute'
+import {EndRetrospectiveMutation as TEndRetrospectiveMutation} from '../__generated__/EndRetrospectiveMutation.graphql'
 import {RetroDemo} from '../types/constEnums'
 import {
   HistoryMaybeLocalHandler,
@@ -12,7 +13,6 @@ import {
   SharedUpdater,
   StandardMutation
 } from '../types/relayMutations'
-import {EndRetrospectiveMutation as TEndRetrospectiveMutation} from '../__generated__/EndRetrospectiveMutation.graphql'
 import handleAddTimelineEvent from './handlers/handleAddTimelineEvent'
 import handleRemoveSuggestedActions from './handlers/handleRemoveSuggestedActions'
 import popEndMeetingToast from './toasts/popEndMeetingToast'
@@ -28,39 +28,31 @@ graphql`
       reflectionCount
       taskCount
       topicCount
-      autogroupReflectionGroups {
-        groupTitle
+      organization {
+        useAI
       }
       reflectionGroups(sortBy: voteCount) {
-        summary
         reflections {
           id
         }
       }
+      transcription {
+        speaker
+        words
+      }
       phases {
         phaseType
-        ... on DiscussPhase {
-          stages {
-            discussion {
-              summary
-            }
-          }
-        }
       }
     }
     team {
+      ...TeamInsights_team
       id
       activeMeetings {
         id
       }
     }
     timelineEvent {
-      id
-      team {
-        id
-        name
-      }
-      type
+      ...TimelineEventCompletedRetroMeeting_timelineEvent @relay(mask: false)
     }
   }
 `
@@ -102,7 +94,7 @@ export const endRetrospectiveTeamOnNext: OnNextHandler<
   const {isKill, meeting} = payload
   const {atmosphere, history} = context
   if (!meeting) return
-  const {id: meetingId, teamId, reflectionGroups, phases, autogroupReflectionGroups} = meeting
+  const {id: meetingId, teamId, reflectionGroups, phases, organization} = meeting
   if (meetingId === RetroDemo.MEETING_ID) {
     if (isKill) {
       window.localStorage.removeItem('retroDemo')
@@ -115,20 +107,13 @@ export const endRetrospectiveTeamOnNext: OnNextHandler<
       history.push(`/team/${teamId}`)
       popEndMeetingToast(atmosphere, meetingId)
     } else {
-      const discussPhase = phases.find((phase) => phase.phaseType === 'discuss')
-      const {stages} = discussPhase ?? {}
-      const hasTopicSummary = reflectionGroups.some((group) => group.summary)
       const reflections = reflectionGroups.flatMap((group) => group.reflections) // reflectionCount hasn't been calculated yet so check reflections length
-      const hasDiscussionSummary = !!stages?.some((stage) => stage.discussion?.summary)
-      const hasOpenAISummary = hasTopicSummary || hasDiscussionSummary
+      const hasMoreThanOneReflection = reflections.length > 1
+      const hasOpenAISummary =
+        hasMoreThanOneReflection && organization.useAI && window.__ACTION__.hasOpenAI
       const hasTeamHealth = phases.some((phase) => phase.phaseType === 'TEAM_HEALTH')
       const pathname = `/new-summary/${meetingId}`
       const search = new URLSearchParams()
-      const hasSuggestGroups = !!autogroupReflectionGroups?.length
-      if (hasSuggestGroups) {
-        const suggestGroupsStr = reflections.length > 40 ? 'sg-xl' : 'sg'
-        search.append(suggestGroupsStr, 'true')
-      }
       if (hasOpenAISummary) {
         search.append('ai', 'true')
       }

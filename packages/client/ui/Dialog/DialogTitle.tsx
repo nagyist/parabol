@@ -1,8 +1,8 @@
-import React from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
+import {forwardRef} from 'react'
 import {twMerge} from 'tailwind-merge'
 
-export const DialogTitle = React.forwardRef<
+export const DialogTitle = forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof RadixDialog.Title>
 >(({className, children, ...props}, ref) => (

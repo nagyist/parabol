@@ -1,33 +1,13 @@
 import styled from '@emotion/styled'
+import {ManageAccounts} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {Fragment, useMemo} from 'react'
 import {useFragment} from 'react-relay'
-import {useRouteMatch} from 'react-router'
-import {PALETTE} from '~/styles/paletteV3'
-import {Breakpoint} from '~/types/constEnums'
-import makeMinWidthMediaQuery from '~/utils/makeMinWidthMediaQuery'
-import {
-  DashNavList_viewer$key,
-  DashNavList_viewer$data
-} from '../../__generated__/DashNavList_viewer.graphql'
-import LeftDashNavItem from '../Dashboard/LeftDashNavItem'
-
-const DashNavListStyles = styled('div')({
-  paddingRight: 8,
-  width: '100%'
-})
-
-const OrgName = styled('div')({
-  paddingTop: 8,
-  paddingLeft: 8,
-  fontWeight: 600,
-  fontSize: 12,
-  lineHeight: '24px',
-  color: PALETTE.SLATE_500,
-  [makeMinWidthMediaQuery(Breakpoint.SIDEBAR_LEFT)]: {
-    paddingLeft: 16
-  }
-})
+import {DashNavList_organization$key} from '../../__generated__/DashNavList_organization.graphql'
+import {TierEnum} from '../../__generated__/OrganizationSubscription.graphql'
+import {Tooltip} from '../../ui/Tooltip/Tooltip'
+import {TooltipContent} from '../../ui/Tooltip/TooltipContent'
+import {TooltipTrigger} from '../../ui/Tooltip/TooltipTrigger'
+import DashNavListTeams from './DashNavListTeams'
 
 const EmptyTeams = styled('div')({
   fontSize: 16,
@@ -36,97 +16,72 @@ const EmptyTeams = styled('div')({
   textAlign: 'center'
 })
 
-const DashHR = styled('div')({
-  borderBottom: `1px solid ${PALETTE.SLATE_300}`,
-  width: 'calc(100% + 8px)'
+const StyledIcon = styled(ManageAccounts)({
+  height: 18,
+  width: 18
 })
 
 interface Props {
-  className?: string
-  viewer: DashNavList_viewer$key | null
+  organizationsRef: DashNavList_organization$key
   onClick?: () => void
 }
 
-type Team = DashNavList_viewer$data['teams'][0]
-
 const DashNavList = (props: Props) => {
-  const {className, onClick, viewer: viewerRef} = props
-  const viewer = useFragment(
+  const {onClick, organizationsRef} = props
+  const organizations = useFragment(
     graphql`
-      fragment DashNavList_viewer on User {
-        teams {
-          ...DashNavListTeam @relay(mask: false)
+      fragment DashNavList_organization on Organization @relay(plural: true) {
+        ...DashNavListTeams_organization
+        id
+        name
+        tier
+        viewerTeams {
+          id
         }
       }
     `,
-    viewerRef
+    organizationsRef
   )
-  const teams = viewer?.teams
 
-  const teamsByOrgKey = useMemo(() => {
-    if (!teams) return null
-    const teamsByOrgId = {} as {[key: string]: Team[]}
-    teams.forEach((team) => {
-      const {organization} = team
-      const {id: orgId, name: orgName} = organization
-      const key = `${orgName}:${orgId}`
-      teamsByOrgId[key] = teamsByOrgId[key] || []
-      teamsByOrgId[key]!.push(team)
-    })
-    return Object.entries(teamsByOrgId).sort((a, b) =>
-      a[0].toLowerCase() < b[0].toLowerCase() ? -1 : 1
-    )
-  }, [teams])
-  if (!teams || !teamsByOrgKey) return null
+  const TierEnumValues: TierEnum[] = ['enterprise', 'team', 'starter']
 
-  if (teams.length === 0) {
-    return <EmptyTeams>It appears you are not a member of any team!</EmptyTeams>
-  }
+  const sortedOrgs = organizations.toSorted((a, b) => {
+    const aTier = TierEnumValues.indexOf(a.tier)
+    const bTier = TierEnumValues.indexOf(b.tier)
+    return aTier < bTier ? -1 : aTier > bTier ? 1 : a.name.localeCompare(b.name)
+  })
 
-  // const team = Object.values(teamsByOrgKey)
-  const isSingleOrg = teamsByOrgKey.length === 1
-
-  const showWarningIcon = (team: Team) => {
-    return team.isPaid && !team.organization.lockedAt ? 'group' : 'warning'
-  }
-
-  const teamRouteMatch = useRouteMatch<{teamSubPage: string}>('/team/:teamId/:teamSubPage')
-  const {teamSubPage = ''} = teamRouteMatch?.params || {}
+  const teams = organizations.flatMap((org) => org.viewerTeams)
 
   return (
-    <DashNavListStyles>
-      {isSingleOrg
-        ? teams.map((team) => (
-            <LeftDashNavItem
-              className={className}
-              onClick={onClick}
-              key={team.id}
-              icon={showWarningIcon(team)}
-              href={`/team/${team.id}/${teamSubPage}`}
-              label={team.name}
-            />
-          ))
-        : teamsByOrgKey.map((entry, idx) => {
-            const [key, teams] = entry
-            const name = key.slice(0, key.lastIndexOf(':'))
-            return (
-              <Fragment key={key}>
-                <OrgName>{name}</OrgName>
-                {teams.map((team) => (
-                  <LeftDashNavItem
-                    className={className}
-                    onClick={onClick}
-                    key={team.id}
-                    icon={showWarningIcon(team)}
-                    href={`/team/${team.id}/${teamSubPage}`}
-                    label={team.name}
-                  />
-                ))}
-                {idx !== teamsByOrgKey.length - 1 && <DashHR />}
-              </Fragment>
-            )
-          })}
-    </DashNavListStyles>
+    <div className='w-full p-3 pb-0 pt-4'>
+      {sortedOrgs.map((org) => (
+        <div key={org.id} className='w-full pb-4'>
+          <div className='mb-1 flex min-w-0 flex-1 flex-wrap items-center justify-between'>
+            <span className='flex-1 pl-3 text-base font-semibold leading-6 text-slate-700'>
+              {org.name}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  className='flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-300'
+                  href={`/me/organizations/${org.id}/billing`}
+                >
+                  <StyledIcon />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side='bottom' align='center' sideOffset={4}>
+                {'Settings & Members'}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <DashNavListTeams onClick={onClick} organizationRef={org} />
+        </div>
+      ))}
+      {teams?.length === 0 && (
+        <EmptyTeams>{'It appears you are not a member of any team!'}</EmptyTeams>
+      )}
+    </div>
   )
 }
 
@@ -135,6 +90,8 @@ graphql`
     id
     isPaid
     name
+    isViewerOnTeam
+    tier
     organization {
       id
       name
@@ -142,4 +99,5 @@ graphql`
     }
   }
 `
+
 export default DashNavList

@@ -22,6 +22,7 @@ module.exports = {
   },
   stats: 'errors-warnings',
   devServer: {
+    allowedHosts: ['localhost', 'host.docker.internal'],
     client: {
       logging: 'warn'
     },
@@ -48,7 +49,7 @@ module.exports = {
     hot: true,
     historyApiFallback: true,
     port: PORT,
-    proxy: [
+    proxy: [...[
       'sse',
       'sse-ping',
       'jira-attachments',
@@ -57,14 +58,18 @@ module.exports = {
       'graphql',
       'intranet-graphql',
       'self-hosted',
+      'mattermost',
       // important terminating / so saml-redirect doesn't get targeted, too
       'saml/'
-    ].reduce((obj, name) => {
-      obj[`/${name}`] = {
-        target: `http://localhost:${SOCKET_PORT}`
-      }
-      return obj
-    }, {})
+    ].map((name) => ({
+      context: [`/${name}`],
+      target: `http://localhost:${SOCKET_PORT}`
+    })),
+    {
+      context: '/components',
+      pathRewrite: { '^/components': '' },
+      target: `http://localhost:3002`
+    }]
   },
   infrastructureLogging: {level: 'warn'},
   watchOptions: {
@@ -92,7 +97,9 @@ module.exports = {
     alias: {
       '~': CLIENT_ROOT,
       'parabol-client': CLIENT_ROOT,
-      static: STATIC_ROOT
+      static: STATIC_ROOT,
+      // this is for radix-ui, we import & transform ESM packages, but they can't find react/jsx-runtime
+      'react/jsx-runtime': require.resolve('react/jsx-runtime')
     },
     extensions: ['.js', '.json', '.ts', '.tsx'],
     fallback: {
@@ -121,16 +128,26 @@ module.exports = {
         github: process.env.GITHUB_CLIENT_ID,
         google: process.env.GOOGLE_OAUTH_CLIENT_ID,
         googleAnalytics: process.env.GA_TRACKING_ID,
-        segment: process.env.SEGMENT_WRITE_KEY,
+        mattermostDisabled:
+          !!process.env.MATTERMOST_SECRET || process.env.MATTERMOST_DISABLED === 'true',
+        msTeamsDisabled: process.env.MSTEAMS_DISABLED === 'true',
         sentry: process.env.SENTRY_DSN,
         slack: process.env.SLACK_CLIENT_ID,
         stripe: process.env.STRIPE_PUBLISHABLE_KEY,
         oauth2Redirect: process.env.OAUTH2_REDIRECT,
+        hasOpenAI: !!process.env.OPEN_AI_API_KEY,
         prblIn: process.env.INVITATION_SHORTLINK,
         AUTH_INTERNAL_ENABLED: process.env.AUTH_INTERNAL_DISABLED !== 'true',
         AUTH_GOOGLE_ENABLED: process.env.AUTH_GOOGLE_DISABLED !== 'true',
+        AUTH_MICROSOFT_ENABLED: process.env.AUTH_MICROSOFT_DISABLED !== 'true',
         AUTH_SSO_ENABLED: process.env.AUTH_SSO_DISABLED !== 'true',
-        AMPLITUDE_WRITE_KEY: process.env.AMPLITUDE_WRITE_KEY
+        AMPLITUDE_WRITE_KEY: process.env.AMPLITUDE_WRITE_KEY,
+        microsoftTenantId: process.env.MICROSOFT_TENANT_ID,
+        microsoft: process.env.MICROSOFT_CLIENT_ID,
+        GLOBAL_BANNER_ENABLED: process.env.GLOBAL_BANNER_ENABLED === 'true',
+        GLOBAL_BANNER_TEXT: process.env.GLOBAL_BANNER_TEXT,
+        GLOBAL_BANNER_BG_COLOR: process.env.GLOBAL_BANNER_BG_COLOR,
+        GLOBAL_BANNER_COLOR: process.env.GLOBAL_BANNER_COLOR
       })
     }),
     new ReactRefreshWebpackPlugin(),
@@ -171,7 +188,8 @@ module.exports = {
           {
             loader: '@sucrase/webpack-loader',
             options: {
-              transforms: ['jsx']
+              transforms: ['jsx'],
+              jsxRuntime: 'automatic'
             }
           }
         ]

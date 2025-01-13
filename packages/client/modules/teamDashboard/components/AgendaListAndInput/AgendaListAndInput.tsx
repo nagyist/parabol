@@ -1,13 +1,12 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import {
-  AgendaListAndInput_meeting$key,
-  AgendaListAndInput_meeting$data
+  AgendaListAndInput_meeting$data,
+  AgendaListAndInput_meeting$key
 } from '~/__generated__/AgendaListAndInput_meeting.graphql'
-import useGotoStageId from '../../../../hooks/useGotoStageId'
 import {AgendaListAndInput_team$key} from '../../../../__generated__/AgendaListAndInput_team.graphql'
+import useGotoStageId from '../../../../hooks/useGotoStageId'
 import AgendaInput from '../AgendaInput/AgendaInput'
 import AgendaList from '../AgendaList/AgendaList'
 
@@ -39,7 +38,7 @@ interface Props {
   team: AgendaListAndInput_team$key
 }
 
-const getAgendaItems = (meeting: AgendaListAndInput_meeting$data | null) => {
+const getAgendaItems = (meeting: AgendaListAndInput_meeting$data | null | undefined) => {
   if (!meeting) return null
   const agendaItemsPhase = meeting.phases!.find((phase) => phase.phaseType === 'agendaitems')
   if (!agendaItemsPhase?.stages) return null
@@ -55,7 +54,6 @@ const AgendaListAndInput = (props: Props) => {
         agendaItems {
           id
           content
-          sortOrder
           ...AgendaList_agendaItems
         }
       }

@@ -1,24 +1,24 @@
 import styled from '@emotion/styled'
+import {KeyboardArrowLeft, KeyboardArrowRight} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import {Link} from 'react-router-dom'
-import React from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
+import {Link} from 'react-router-dom'
+import {TeamPromptTopBar_meeting$key} from '~/__generated__/TeamPromptTopBar_meeting.graphql'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import {useRenameMeeting} from '~/hooks/useRenameMeeting'
 import NewMeetingAvatarGroup from '~/modules/meeting/components/MeetingAvatarGroup/NewMeetingAvatarGroup'
-import {TeamPromptTopBar_meeting$key} from '~/__generated__/TeamPromptTopBar_meeting.graphql'
 import useModal from '../../hooks/useModal'
 import {meetingAvatarMediaQueries, meetingTopBarMediaQuery} from '../../styles/meeting'
+import SendClientSideEvent from '../../utils/SendClientSideEvent'
 import EditableText from '../EditableText'
+import IconLabel from '../IconLabel'
 import LogoBlock from '../LogoBlock/LogoBlock'
 import {IconGroupBlock, MeetingTopBarStyles} from '../MeetingTopBar'
-import {HumanReadableRecurrenceRule} from './Recurrence/HumanReadableRecurrenceRule'
-import {UpdateRecurrenceSettingsModal} from './Recurrence/UpdateRecurrenceSettingsModal'
-import {EndRecurringMeetingModal} from './Recurrence/EndRecurringMeetingModal'
+import {EndRecurringMeetingModal} from '../Recurrence/EndRecurringMeetingModal'
+import {HumanReadableRecurrenceRule} from '../Recurrence/HumanReadableRecurrenceRule'
+import {UpdateRecurrenceSettingsModal} from '../Recurrence/UpdateRecurrenceSettingsModal'
 import {TeamPromptMeetingStatus} from './TeamPromptMeetingStatus'
 import TeamPromptOptions from './TeamPromptOptions'
-import {KeyboardArrowLeft, KeyboardArrowRight} from '@mui/icons-material'
-import IconLabel from '../IconLabel'
 
 const TeamPromptLogoBlock = styled(LogoBlock)({
   marginRight: '8px',
@@ -95,6 +95,7 @@ const TeamPromptTopBar = (props: Props) => {
       fragment TeamPromptTopBar_meeting on TeamPromptMeeting {
         id
         name
+        teamId
         isRightDrawerOpen
         showWorkSidebar
         facilitatorUserId
@@ -114,6 +115,7 @@ const TeamPromptTopBar = (props: Props) => {
         ...NewMeetingAvatarGroup_meeting
         ...TeamPromptMeetingStatus_meeting
         ...UpdateRecurrenceSettingsModal_meeting
+        ...EndRecurringMeetingModal_meeting
       }
     `,
     meetingRef
@@ -139,11 +141,17 @@ const TeamPromptTopBar = (props: Props) => {
 
   const onOpenWorkSidebar = () => {
     if (meeting.isRightDrawerOpen && meeting.showWorkSidebar && !meeting.localStageId) {
-      // If we're selecting a discussion that's already open, just close the drawer.
+      // If we're clicking on 'Your Work' when it's already open, just close the drawer.
       commitLocalUpdate(atmosphere, (store) => {
         const meetingProxy = store.get(meetingId)
         if (!meetingProxy) return
         meetingProxy.setValue(false, 'isRightDrawerOpen')
+
+        SendClientSideEvent(atmosphere, 'Your Work Drawer Closed', {
+          teamId: meeting.teamId,
+          meetingId: meeting.id,
+          source: 'top bar'
+        })
       })
     } else {
       commitLocalUpdate(atmosphere, (store) => {
@@ -152,6 +160,12 @@ const TeamPromptTopBar = (props: Props) => {
         meetingProxy.setValue(null, 'localStageId')
         meetingProxy.setValue(true, 'showWorkSidebar')
         meetingProxy.setValue(true, 'isRightDrawerOpen')
+
+        SendClientSideEvent(atmosphere, 'Your Work Drawer Opened', {
+          teamId: meeting.teamId,
+          meetingId: meeting.id,
+          source: 'top bar'
+        })
       })
     }
   }
@@ -230,7 +244,7 @@ const TeamPromptTopBar = (props: Props) => {
         )}
         {endRecurringMeetingModal(
           <EndRecurringMeetingModal
-            meetingId={meetingId}
+            meetingRef={meeting}
             recurrenceRule={isRecurrenceEnabled ? meetingSeries.recurrenceRule : undefined}
             closeModal={toggleEndRecurringMeetingModal}
           />

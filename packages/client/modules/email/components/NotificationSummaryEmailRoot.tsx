@@ -1,7 +1,6 @@
 import graphql from 'babel-plugin-relay/macro'
 import ms from 'ms'
 import {NotificationSummaryEmailRootQuery} from 'parabol-client/__generated__/NotificationSummaryEmailRootQuery.graphql'
-import React from 'react'
 import {useLazyLoadQuery} from 'react-relay'
 import {NOTIFICATION_TEMPLATE_TYPE} from './EmailNotifications/EmailNotificationPicker'
 import NotificationSummaryEmail from './NotificationSummaryEmail'
@@ -56,7 +55,7 @@ const NotificationSummaryEmailRoot = (props: NotificationSummaryRootProps) => {
       (edge) =>
         edge.node.status === 'UNREAD' &&
         new Date(edge.node.createdAt) > new Date(Date.now() - ms('1d')) &&
-        NOTIFICATION_TEMPLATE_TYPE[edge.node.type] // Filter down to the notifications that have been implemented.
+        NOTIFICATION_TEMPLATE_TYPE[edge.node.type as keyof typeof NOTIFICATION_TEMPLATE_TYPE] // Filter down to the notifications that have been implemented.
     )
     .map((edge) => edge.node)
     .slice(0, MAX_EMAIL_NOTIFICATIONS)

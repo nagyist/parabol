@@ -1,12 +1,14 @@
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
+import {useEffect} from 'react'
 import {useFragment} from 'react-relay'
+import {TeamsLimitExceededNotification_notification$key} from '~/__generated__/TeamsLimitExceededNotification_notification.graphql'
 import useRouter from '~/hooks/useRouter'
 import defaultOrgAvatar from '~/styles/theme/images/avatar-organization.svg'
-import {TeamsLimitExceededNotification_notification$key} from '~/__generated__/TeamsLimitExceededNotification_notification.graphql'
+import useAtmosphere from '../hooks/useAtmosphere'
+import {Threshold} from '../types/constEnums'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 import NotificationAction from './NotificationAction'
 import NotificationTemplate from './NotificationTemplate'
-import {Threshold} from '../types/constEnums'
 
 interface Props {
   notification: TeamsLimitExceededNotification_notification$key
@@ -14,11 +16,13 @@ interface Props {
 
 const TeamsLimitExceededNotification = (props: Props) => {
   const {notification: notificationRef} = props
+  const atmosphere = useAtmosphere()
   const notification = useFragment(
     graphql`
       fragment TeamsLimitExceededNotification_notification on NotifyTeamsLimitExceeded {
         ...NotificationTemplate_notification
         id
+        orgId
         orgName
         orgPicture
       }
@@ -26,17 +30,27 @@ const TeamsLimitExceededNotification = (props: Props) => {
     notificationRef
   )
   const {history} = useRouter()
-  const {orgName, orgPicture} = notification
+  const {orgId, orgName, orgPicture} = notification
+
+  useEffect(() => {
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Viewed', {
+      upgradeCTALocation: 'teamsLimitExceededNotification',
+      orgId
+    })
+  }, [])
 
   const onActionClick = () => {
-    history.push(`/usage`)
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Clicked', {
+      upgradeCTALocation: 'teamsLimitExceededNotification'
+    })
+    history.push(`/me/organizations/${orgId}`)
   }
 
   return (
     <NotificationTemplate
       avatar={orgPicture || defaultOrgAvatar}
-      message={`"${orgName}" is over the limit of ${Threshold.MAX_STARTER_TIER_TEAMS} free teams. Action is needed.`}
-      action={<NotificationAction label={'See Usage'} onClick={onActionClick} />}
+      message={`"${orgName}" is over the limit of ${Threshold.MAX_STARTER_TIER_TEAMS} free teams.`}
+      action={<NotificationAction label={'Upgrade'} onClick={onActionClick} />}
       notification={notification}
     />
   )

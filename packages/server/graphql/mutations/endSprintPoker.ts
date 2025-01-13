@@ -1,12 +1,11 @@
 import {GraphQLID, GraphQLNonNull} from 'graphql'
+import {sql} from 'kysely'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import getMeetingPhase from 'parabol-client/utils/getMeetingPhase'
 import findStageById from 'parabol-client/utils/meetings/findStageById'
-import {checkTeamsLimit} from '../../billing/helpers/teamLimitsCheck'
-import getRethink from '../../database/rethinkDriver'
-import Meeting from '../../database/types/Meeting'
-import MeetingPoker from '../../database/types/MeetingPoker'
 import TimelineEventPokerComplete from '../../database/types/TimelineEventPokerComplete'
+import getKysely from '../../postgres/getKysely'
+import {Logger} from '../../utils/Logger'
 import {analytics} from '../../utils/analytics/analytics'
 import {getUserId, isSuperUser, isTeamMember} from '../../utils/authorization'
 import getPhase from '../../utils/getPhase'
@@ -14,12 +13,12 @@ import getRedis from '../../utils/getRedis'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
+import isValid from '../isValid'
 import EndSprintPokerPayload from '../types/EndSprintPokerPayload'
-import gatherInsights from './helpers/gatherInsights'
 import sendNewMeetingSummary from './helpers/endMeeting/sendNewMeetingSummary'
+import gatherInsights from './helpers/gatherInsights'
 import {IntegrationNotifier} from './helpers/notifications/IntegrationNotifier'
 import removeEmptyTasks from './helpers/removeEmptyTasks'
-import updateTeamInsights from './helpers/updateTeamInsights'
 
 export default {
   type: new GraphQLNonNull(EndSprintPokerPayload),
@@ -32,19 +31,17 @@ export default {
   },
   async resolve(_source: unknown, {meetingId}: {meetingId: string}, context: GQLContext) {
     const {authToken, socketId: mutatorId, dataLoader} = context
-    const r = await getRethink()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
     const now = new Date()
     const viewerId = getUserId(authToken)
 
     // AUTH
-    const meeting = (await r
-      .table('NewMeeting')
-      .get(meetingId)
-      .default(null)
-      .run()) as Meeting | null
+    const meeting = await dataLoader.get('newMeetings').load(meetingId)
     if (!meeting) return standardError(new Error('Meeting not found'), {userId: viewerId})
+    if (meeting.meetingType !== 'poker') {
+      return standardError(new Error('Meeting is not a poker meeting'), {userId: viewerId})
+    }
     const {endedAt, facilitatorStageId, phases, teamId} = meeting
 
     // VALIDATION
@@ -75,30 +72,26 @@ export default {
     ).size
     const discussionIds = estimateStages.map((stage) => stage.discussionId)
     const insights = await gatherInsights(meeting, dataLoader)
-
-    const completedMeeting = (await r
-      .table('NewMeeting')
-      .get(meetingId)
-      .update(
-        {
-          endedAt: now,
-          phases,
-          commentCount: r
-            .table('Comment')
-            .getAll(r.args(discussionIds), {index: 'discussionId'})
-            .count()
-            .default(0) as unknown as number,
-          storyCount,
-          ...insights
-        },
-        {returnChanges: true, nonAtomic: true}
-      )('changes')(0)('new_val')
-      .default(null)
-      .run()) as unknown as MeetingPoker
-    if (!completedMeeting) {
-      return standardError(new Error('Completed poker meeting does not exist'), {
-        userId: viewerId
+    const commentCounts = (
+      await dataLoader.get('commentCountByDiscussionId').loadMany(discussionIds)
+    ).filter(isValid)
+    const commentCount = commentCounts.reduce((cumSum, count) => cumSum + count, 0)
+    await getKysely()
+      .updateTable('NewMeeting')
+      .set({
+        endedAt: sql`CURRENT_TIMESTAMP`,
+        phases: JSON.stringify(phases),
+        commentCount,
+        storyCount,
+        usedReactjis: JSON.stringify(insights.usedReactjis),
+        engagement: insights.engagement
       })
+      .where('id', '=', meetingId)
+      .execute()
+    dataLoader.clearAll('newMeetings')
+    const completedMeeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
+    if (completedMeeting.meetingType !== 'poker') {
+      return standardError(new Error('Meeting is not a poker meeting'), {userId: viewerId})
     }
     const {templateId} = completedMeeting
     const [meetingMembers, team, teamMembers, removedTaskIds, template] = await Promise.all([
@@ -110,12 +103,10 @@ export default {
       dataLoader.get('meetingTemplates').loadNonNull(templateId)
     ])
     IntegrationNotifier.endMeeting(dataLoader, meetingId, teamId)
-    updateTeamInsights(teamId, dataLoader)
-    analytics.sprintPokerEnd(completedMeeting, meetingMembers, template)
+    analytics.sprintPokerEnd(completedMeeting, meetingMembers, template, dataLoader)
     const isKill = !!(phase && phase.phaseType !== 'ESTIMATE')
     if (!isKill) {
-      sendNewMeetingSummary(completedMeeting, context).catch(console.log)
-      checkTeamsLimit(team.orgId, dataLoader)
+      sendNewMeetingSummary(completedMeeting, context).catch(Logger.log)
     }
     const events = teamMembers.map(
       (teamMember) =>
@@ -126,7 +117,8 @@ export default {
           meetingId
         })
     )
-    await r.table('TimelineEvent').insert(events).run()
+    const pg = getKysely()
+    await pg.insertInto('TimelineEvent').values(events).execute()
 
     const data = {
       meetingId,
