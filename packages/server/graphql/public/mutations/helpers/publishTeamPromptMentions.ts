@@ -1,7 +1,7 @@
 import {JSONContent} from '@tiptap/core'
-import getRethink from '../../../../database/rethinkDriver'
-import NotificationResponseMentioned from '../../../../database/types/NotificationResponseMentioned'
-import {TeamPromptResponse} from '../../../../postgres/queries/getTeamPromptResponsesByIds'
+import generateUID from '../../../../generateUID'
+import getKysely from '../../../../postgres/getKysely'
+import {TeamPromptResponse} from '../../../../postgres/types'
 
 const getMentionedUserIdsFromContent = (content: JSONContent): string[] => {
   if (content.type === 'mention' && content.attrs?.id) {
@@ -36,18 +36,16 @@ const createTeamPromptMentionNotifications = async (
     return []
   }
 
-  const notificationsToAdd = addedMentions.map(
-    (mention) =>
-      new NotificationResponseMentioned({
-        userId: mention,
-        responseId: newResponse.id,
-        meetingId: newResponse.meetingId
-      })
-  )
+  const notificationsToAdd = addedMentions.map((mention) => ({
+    id: generateUID(),
+    type: 'RESPONSE_MENTIONED' as const,
+    userId: mention,
+    responseId: newResponse.id,
+    meetingId: newResponse.meetingId
+  }))
 
-  const r = await getRethink()
-  await r.table('Notification').insert(notificationsToAdd).run()
-
+  const pg = getKysely()
+  await pg.insertInto('Notification').values(notificationsToAdd).execute()
   return notificationsToAdd
 }
 

@@ -1,5 +1,5 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo, useRef} from 'react'
+import {useMemo, useRef} from 'react'
 import {useFragment} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import useRouter from '~/hooks/useRouter'
@@ -7,11 +7,11 @@ import useSearchFilter from '~/hooks/useSearchFilter'
 import {FilterLabels} from '~/types/constEnums'
 import constructFilterQueryParamURL from '~/utils/constructFilterQueryParamURL'
 import {useQueryParameterParser} from '~/utils/useQueryParameterParser'
-import {MenuProps} from '../hooks/useMenu'
 import {
-  UserDashTeamMemberMenu_viewer$key,
-  UserDashTeamMemberMenu_viewer$data
+  UserDashTeamMemberMenu_viewer$data,
+  UserDashTeamMemberMenu_viewer$key
 } from '../__generated__/UserDashTeamMemberMenu_viewer.graphql'
+import {MenuProps} from '../hooks/useMenu'
 import DropdownMenuLabel from './DropdownMenuLabel'
 import {EmptyDropdownMenuItemLabel} from './EmptyDropdownMenuItemLabel'
 import Menu from './Menu'
@@ -20,7 +20,7 @@ import {SearchMenuItem} from './SearchMenuItem'
 
 interface Props {
   menuProps: MenuProps
-  viewer: UserDashTeamMemberMenu_viewer$key | null
+  viewer: UserDashTeamMemberMenu_viewer$key | null | undefined
 }
 
 const UserDashTeamMemberMenu = (props: Props) => {

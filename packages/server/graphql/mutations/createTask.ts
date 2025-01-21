@@ -1,17 +1,22 @@
+import {generateText} from '@tiptap/core'
 import {GraphQLNonNull, GraphQLObjectType, GraphQLResolveInfo} from 'graphql'
+import {Insertable} from 'kysely'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import getTypeFromEntityMap from 'parabol-client/utils/draftjs/getTypeFromEntityMap'
 import toTeamMemberId from 'parabol-client/utils/relay/toTeamMemberId'
-import normalizeRawDraftJS from 'parabol-client/validation/normalizeRawDraftJS'
 import MeetingMemberId from '../../../client/shared/gqlIds/MeetingMemberId'
-import getRethink from '../../database/rethinkDriver'
-import NotificationTaskInvolves from '../../database/types/NotificationTaskInvolves'
-import Task, {TaskServiceEnum} from '../../database/types/Task'
-import TeamMember from '../../database/types/TeamMember'
+import {getAllNodesAttributesByType} from '../../../client/shared/tiptap/getAllNodesAttributesByType'
+import {getTagsFromTipTapTask} from '../../../client/shared/tiptap/getTagsFromTipTapTask'
+import {serverTipTapExtensions} from '../../../client/shared/tiptap/serverTipTapExtensions'
+import dndNoise from '../../../client/utils/dndNoise'
 import generateUID from '../../generateUID'
 import updatePrevUsedRepoIntegrationsCache from '../../integrations/updatePrevUsedRepoIntegrationsCache'
+import getKysely from '../../postgres/getKysely'
+import {Task} from '../../postgres/types/index.d'
+import {Notification} from '../../postgres/types/pg'
+import {TaskServiceEnum} from '../../postgres/types/TaskIntegration'
 import {analytics} from '../../utils/analytics/analytics'
 import {getUserId, isTeamMember} from '../../utils/authorization'
+import {convertToTipTap} from '../../utils/convertToTipTap'
 import publish, {SubOptions} from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {DataLoaderWorker, GQLContext} from '../graphql'
@@ -59,52 +64,52 @@ const validateTaskDiscussionId = async (
 
 const handleAddTaskNotifications = async (
   teamMembers: any[],
-  task: Task,
+  task: Pick<Task, 'id' | 'content' | 'tags' | 'userId'>,
   viewerId: string,
   teamId: string,
   subOptions: SubOptions
 ) => {
-  const r = await getRethink()
+  const pg = getKysely()
   const {id: taskId, content, tags, userId} = task
   const usersIdsToIgnore = await getUsersToIgnore(viewerId, teamId)
 
   // Handle notifications
   // Almost always you start out with a blank card assigned to you (except for filtered team dash)
   const changeAuthorId = toTeamMemberId(teamId, viewerId)
-  const notificationsToAdd = [] as NotificationTaskInvolves[]
+  const notificationsToAdd = [] as Insertable<Notification>[]
   if (userId && viewerId !== userId && !usersIdsToIgnore.includes(userId)) {
-    notificationsToAdd.push(
-      new NotificationTaskInvolves({
-        involvement: 'ASSIGNEE',
-        taskId,
-        changeAuthorId,
-        teamId,
-        userId
-      })
-    )
+    notificationsToAdd.push({
+      id: generateUID(),
+      type: 'TASK_INVOLVES' as const,
+      involvement: 'ASSIGNEE' as const,
+      taskId,
+      changeAuthorId,
+      teamId,
+      userId
+    })
   }
 
-  const {entityMap} = JSON.parse(content)
-  getTypeFromEntityMap('MENTION', entityMap)
+  const jsonContent = JSON.parse(content)
+  getAllNodesAttributesByType<{id: string; label: string}>(jsonContent, 'mention')
     .filter(
-      (mention) => mention !== viewerId && mention !== userId && !usersIdsToIgnore.includes(mention)
+      (mention) =>
+        mention.id !== viewerId && mention.id !== userId && !usersIdsToIgnore.includes(mention.id)
     )
-    .forEach((mentioneeUserId) => {
-      notificationsToAdd.push(
-        new NotificationTaskInvolves({
-          userId: mentioneeUserId,
-          involvement: 'MENTIONEE',
-          taskId,
-          changeAuthorId,
-          teamId
-        })
-      )
+    .forEach((mentionee) => {
+      notificationsToAdd.push({
+        id: generateUID(),
+        type: 'TASK_INVOLVES' as const,
+        userId: mentionee.id,
+        involvement: 'MENTIONEE',
+        taskId,
+        changeAuthorId,
+        teamId
+      })
     })
   const data = {taskId, notifications: notificationsToAdd}
 
   if (notificationsToAdd.length) {
-    // don't await to speed up task creation
-    r.table('Notification').insert(notificationsToAdd).run()
+    await pg.insertInto('Notification').values(notificationsToAdd).execute()
     notificationsToAdd.forEach((notification) => {
       publish(
         SubscriptionChannel.NOTIFICATION,
@@ -154,7 +159,7 @@ export default {
     info: GraphQLResolveInfo
   ) {
     const {authToken, dataLoader, socketId: mutatorId} = context
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const viewerId = getUserId(authToken)
 
@@ -172,7 +177,8 @@ export default {
       return {error: {message: 'Not on team'}}
     }
 
-    const errors = await Promise.all([
+    const [viewer, ...errors] = await Promise.all([
+      dataLoader.get('users').loadNonNull(viewerId),
       // threadParentId not validated because if it's invalid it simply won't appear
       validateTaskDiscussionId(newTask, dataLoader),
       validateTaskMeetingId(meetingId, viewerId, dataLoader),
@@ -183,7 +189,8 @@ export default {
       return standardError(new Error(firstError), {userId: viewerId})
     }
 
-    const content = normalizeRawDraftJS(newTask.content)
+    const content = convertToTipTap(newTask.content)
+    const plaintextContent = generateText(content, serverTipTapExtensions)
 
     // see if the task already exists
     const integrationRes = await createTaskInService(
@@ -204,47 +211,33 @@ export default {
     if (integrationRepoId) {
       updatePrevUsedRepoIntegrationsCache(teamId, integrationRepoId, viewerId)
     }
-    const task = new Task({
-      content,
+    const task = {
+      id: generateUID(),
+      content: JSON.stringify(content),
+      plaintextContent,
       createdBy: viewerId,
       meetingId,
-      sortOrder,
+      sortOrder: sortOrder || dndNoise(),
       status,
       teamId,
       discussionId,
       integrationHash,
-      integration,
+      integration: JSON.stringify(integration),
       threadSortOrder,
       threadParentId,
-      userId
-    })
-    const {id: taskId, updatedAt} = task
-    const history = {
-      id: generateUID(),
-      content,
-      taskId,
-      status,
-      teamId,
-      userId,
-      updatedAt
+      userId: userId || null,
+      tags: getTagsFromTipTapTask(content)
     }
-
-    const {teamMembers} = await r({
-      task: r.table('Task').insert(task),
-      history: r.table('TaskHistory').insert(history),
-      teamMembers: r
-        .table('TeamMember')
-        .getAll(teamId, {index: 'teamId'})
-        .filter({
-          isNotRemoved: true
-        })
-        .coerceTo('array') as unknown as TeamMember[]
-    }).run()
-
+    const {id: taskId} = task
+    const teamMembers = await dataLoader.get('teamMembersByTeamId').load(teamId)
+    await pg.insertInto('Task').values(task).execute()
+    // FIXME
     handleAddTaskNotifications(teamMembers, task, viewerId, teamId, {
       operationId,
       mutatorId
-    }).catch()
+    }).catch(() => {
+      /*ignore*/
+    })
 
     const meeting = meetingId ? await dataLoader.get('newMeetings').load(meetingId) : undefined
     const taskProperties = {
@@ -254,9 +247,9 @@ export default {
       meetingType: meeting?.meetingType,
       inMeeting: !!meetingId
     }
-    analytics.taskCreated(viewerId, taskProperties)
+    analytics.taskCreated(viewer, taskProperties)
     if (integration?.service) {
-      analytics.taskPublished(viewerId, taskProperties, integration.service)
+      analytics.taskPublished(viewer, taskProperties, integration.service)
     }
     return {taskId}
   }

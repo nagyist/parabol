@@ -1,23 +1,26 @@
 import styled from '@emotion/styled'
+import {useEventCallback} from '@mui/material'
+import {generateHTML} from '@tiptap/core'
 import graphql from 'babel-plugin-relay/macro'
-import {convertFromRaw, convertToRaw, EditorState} from 'draft-js'
-import React, {MutableRefObject, RefObject, useEffect, useRef, useState} from 'react'
+import * as React from 'react'
+import {MutableRefObject, RefObject, useEffect, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
+import {PhaseItemEditor_meeting$key} from '../../__generated__/PhaseItemEditor_meeting.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
 import useMutationProps from '../../hooks/useMutationProps'
 import usePortal from '../../hooks/usePortal'
+import {useTipTapReflectionEditor} from '../../hooks/useTipTapReflectionEditor'
 import CreateReflectionMutation from '../../mutations/CreateReflectionMutation'
 import EditReflectionMutation from '../../mutations/EditReflectionMutation'
+import {serverTipTapExtensions} from '../../shared/tiptap/serverTipTapExtensions'
 import {Elevation} from '../../styles/elevation'
-import {PALETTE} from '../../styles/paletteV3'
 import {BezierCurve, ZIndex} from '../../types/constEnums'
-import convertToTaskContent from '../../utils/draftjs/convertToTaskContent'
-import {PhaseItemEditor_meeting$key} from '../../__generated__/PhaseItemEditor_meeting.graphql'
+import {cn} from '../../ui/cn'
 import ReflectionCardAuthor from '../ReflectionCard/ReflectionCardAuthor'
 import ReflectionCardRoot from '../ReflectionCard/ReflectionCardRoot'
-import ReflectionEditorWrapper from '../ReflectionEditorWrapper'
-import getBBox from './getBBox'
+import {TipTapEditor} from '../promptResponse/TipTapEditor'
 import {ReflectColumnCardInFlight} from './PhaseItemColumn'
+import getBBox from './getBBox'
 
 const FLIGHT_TIME = 500
 const CardInFlightStyles = styled(ReflectionCardRoot)<{transform: string; isStart: boolean}>(
@@ -30,21 +33,6 @@ const CardInFlightStyles = styled(ReflectionCardRoot)<{transform: string; isStar
     zIndex: ZIndex.REFLECTION_IN_FLIGHT
   })
 )
-
-const EnterHint = styled('div')<{visible: boolean}>(({visible}) => ({
-  color: PALETTE.SLATE_600,
-  fontSize: 14,
-  fontStyle: 'italic',
-  fontWeight: 400,
-  lineHeight: '20px',
-  paddingLeft: 16,
-  cursor: 'pointer',
-  visibility: visible ? undefined : 'hidden',
-  opacity: visible ? 1 : 0,
-  height: visible ? 28 : 0,
-  overflow: 'hidden',
-  transition: 'height 300ms, opacity 300ms'
-}))
 
 interface Props {
   cardsInFlightRef: MutableRefObject<ReflectColumnCardInFlight[]>
@@ -73,38 +61,6 @@ const PhaseItemEditor = (props: Props) => {
     meetingRef
   } = props
   const atmosphere = useAtmosphere()
-  const {onCompleted, onError, submitMutation} = useMutationProps()
-  const [editorState, setEditorState] = useState(EditorState.createEmpty)
-  const [isEditing, setIsEditing] = useState(false)
-  const idleTimerIdRef = useRef<number>()
-  const {terminatePortal, openPortal, portal} = usePortal({noClose: true, id: 'phaseItemEditor'})
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(idleTimerIdRef.current)
-    }
-  }, [idleTimerIdRef])
-
-  const [isFocused, setIsFocused] = useState(false)
-  const [enterHint, setEnterHint] = useState('')
-  const hindTimerRef = useRef<number>()
-  // delay setting the enterHint slightly, so when someone presses on the inFocus hint, it doesn't
-  // change to the !inFocus one during the transition
-  useEffect(() => {
-    const visible = !isEditing && editorState.getCurrentContent().hasText()
-    if (visible) {
-      const newEnterHint = isFocused
-        ? 'Press enter to add'
-        : 'Forgot to press enter? Click here to add 👆'
-      hindTimerRef.current = window.setTimeout(() => setEnterHint(newEnterHint), 500)
-      return () => {
-        window.clearTimeout(hindTimerRef.current)
-      }
-    } else {
-      setEnterHint('')
-      return undefined
-    }
-  }, [isFocused, isEditing, editorState.getCurrentContent().hasText()])
-
   const meeting = useFragment(
     graphql`
       fragment PhaseItemEditor_meeting on RetrospectiveMeeting {
@@ -114,14 +70,26 @@ const PhaseItemEditor = (props: Props) => {
             preferredName
           }
         }
+        teamId
       }
     `,
     meetingRef
   )
 
-  const {disableAnonymity, viewerMeetingMember} = meeting
-
-  const handleSubmit = (content: string) => {
+  const {disableAnonymity, viewerMeetingMember, teamId} = meeting
+  const {onCompleted, onError, submitMutation} = useMutationProps()
+  const handleSubmit = useEventCallback(() => {
+    if (!editor || editor.isEmpty) return
+    const contentJSON = editor?.getJSON()
+    const content = JSON.stringify(contentJSON)
+    if (content.length > 2000) {
+      atmosphere.eventEmitter.emit('addSnackbar', {
+        key: 'reflectionTooLong',
+        message: 'Reflection is too long',
+        autoDismiss: 5
+      })
+      return
+    }
     const input = {
       content,
       meetingId,
@@ -133,12 +101,13 @@ const PhaseItemEditor = (props: Props) => {
     const {top, left} = getBBox(phaseEditorRef.current)!
     const cardInFlight = {
       transform: `translate(${left}px,${top}px)`,
-      editorState: EditorState.createWithContent(convertFromRaw(JSON.parse(content))),
+      html: generateHTML(contentJSON, serverTipTapExtensions),
       key: content,
       isStart: true
     }
     openPortal()
     cardsInFlightRef.current = [...cardsInFlightRef.current, cardInFlight]
+    editor.commands.clearContent()
     forceUpdateColumn()
     requestAnimationFrame(() => {
       const stackBBox = getBBox(stackTopRef.current)
@@ -157,24 +126,25 @@ const PhaseItemEditor = (props: Props) => {
       forceUpdateColumn()
       setTimeout(removeCardInFlight(content), FLIGHT_TIME)
     })
-    // move focus to end is very important! otherwise ghost chars appear
-    setEditorState(EditorState.moveFocusToEnd(EditorState.createEmpty()))
-  }
-
-  const handleKeyDownFallback = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Enter' || e.shiftKey) return
-    e.preventDefault()
-    const {value} = e.currentTarget
-    if (!value) return
-    handleSubmit(convertToTaskContent(value))
-  }
-
-  const handleKeydown = () => {
-    // do not throttle based on submitting or they can't submit very quickly
-    const content = editorState.getCurrentContent()
-    if (!content.hasText()) return
-    handleSubmit(JSON.stringify(convertToRaw(content)))
-  }
+  })
+  const {editor, linkState, setLinkState} = useTipTapReflectionEditor(
+    JSON.stringify({type: 'doc', content: [{type: 'paragraph'}]}),
+    {
+      atmosphere,
+      placeholder: 'My reflection… (press enter to add)',
+      teamId,
+      readOnly: !!readOnly,
+      onEnter: handleSubmit
+    }
+  )
+  const [isEditing, setIsEditing] = useState(false)
+  const idleTimerIdRef = useRef<number>()
+  const {terminatePortal, openPortal, portal} = usePortal({noClose: true, id: 'phaseItemEditor'})
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(idleTimerIdRef.current)
+    }
+  }, [idleTimerIdRef])
 
   const ensureNotEditing = () => {
     if (!isEditing) return
@@ -204,18 +174,11 @@ const PhaseItemEditor = (props: Props) => {
     }, 5000)
   }
   const onFocus = () => {
-    setIsFocused(true)
     ensureEditing()
+    return null
   }
   const onBlur = () => {
-    setIsFocused(false)
     ensureNotEditing()
-  }
-
-  const handleReturn = (e: React.KeyboardEvent) => {
-    if (e.shiftKey) return 'not-handled'
-    handleKeydown()
-    return 'handled'
   }
 
   const removeCardInFlight = (content: string) => () => {
@@ -230,49 +193,47 @@ const PhaseItemEditor = (props: Props) => {
     forceUpdateColumn()
   }
 
-  const editorRef = useRef<HTMLTextAreaElement>(null)
-
+  if (!editor) return null
   return (
     <>
-      <ReflectionCardRoot data-cy={dataCy} ref={phaseEditorRef}>
-        <ReflectionEditorWrapper
-          dataCy={`${dataCy}-wrapper`}
-          isPhaseItemEditor
-          ariaLabel={readOnly ? '' : 'Edit this reflection'}
-          editorState={editorState}
-          editorRef={editorRef}
+      <ReflectionCardRoot data-cy={dataCy} ref={phaseEditorRef} className=''>
+        <TipTapEditor
+          className={cn(
+            'flex max-h-28 min-h-0 overflow-auto px-4 pt-3',
+            disableAnonymity ? 'pb-0' : 'pb-3'
+          )}
+          editor={editor}
+          linkState={linkState}
+          setLinkState={setLinkState}
           onBlur={onBlur}
           onFocus={onFocus}
-          handleReturn={handleReturn}
-          handleKeyDownFallback={handleKeyDownFallback}
-          keyBindingFn={onFocus}
-          placeholder='My reflection… (press enter to add)'
-          setEditorState={setEditorState}
-          readOnly={readOnly}
-          disableAnonymity={disableAnonymity}
         />
         {disableAnonymity && (
           <ReflectionCardAuthor>{viewerMeetingMember?.user.preferredName}</ReflectionCardAuthor>
         )}
-        <EnterHint visible={!!enterHint} onClick={handleKeydown}>
-          {enterHint}
-        </EnterHint>
       </ReflectionCardRoot>
       {portal(
         <>
           {cardsInFlightRef.current.map((card) => {
             return (
               <CardInFlightStyles
+                className=''
                 key={card.key}
                 transform={card.transform}
                 isStart={card.isStart}
                 onTransitionEnd={removeCardInFlight(card.key)}
               >
-                <ReflectionEditorWrapper
-                  editorState={card.editorState}
-                  readOnly
-                  disableAnonymity={disableAnonymity}
-                />
+                <div
+                  className={cn('relative w-full overflow-auto text-sm leading-4 text-slate-700')}
+                >
+                  <div
+                    className={cn(
+                      'ProseMirror flex max-h-28 min-h-4 w-full items-center px-4 pt-3 leading-none',
+                      disableAnonymity ? 'pb-0' : 'pb-3'
+                    )}
+                    dangerouslySetInnerHTML={{__html: card.html}}
+                  ></div>
+                </div>
                 {disableAnonymity && (
                   <ReflectionCardAuthor>
                     {viewerMeetingMember?.user.preferredName}

@@ -3,18 +3,16 @@ import {SprintPokerDefaults, SubscriptionChannel, Threshold} from 'parabol-clien
 import makeAppURL from 'parabol-client/utils/makeAppURL'
 import JiraProjectKeyId from '../../../client/shared/gqlIds/JiraProjectKeyId'
 import appOrigin from '../../appOrigin'
-import MeetingPoker from '../../database/types/MeetingPoker'
-import TaskIntegrationJiraServer from '../../database/types/TaskIntegrationJiraServer'
 import JiraServerRestManager from '../../integrations/jiraServer/JiraServerRestManager'
 import {IntegrationProviderJiraServer} from '../../postgres/queries/getIntegrationProvidersByIds'
 import insertTaskEstimate from '../../postgres/queries/insertTaskEstimate'
 import updateJiraDimensionFieldMap from '../../postgres/queries/updateJiraDimensionFieldMap'
 import upsertJiraDimensionFieldMap from '../../postgres/queries/upsertJiraDimensionFieldMap'
-import {analytics} from '../../utils/analytics/analytics'
 import AtlassianServerManager from '../../utils/AtlassianServerManager'
+import AzureDevOpsServerManager from '../../utils/AzureDevOpsServerManager'
+import {analytics} from '../../utils/analytics/analytics'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import {fieldTypeToId} from '../../utils/azureDevOps/azureDevOpsFieldTypeToId'
-import AzureDevOpsServerManager from '../../utils/AzureDevOpsServerManager'
 import getPhase from '../../utils/getPhase'
 import makeScoreJiraComment from '../../utils/makeScoreJiraComment'
 import publish from '../../utils/publish'
@@ -45,9 +43,10 @@ const setTaskEstimate = {
     const {taskId, value, dimensionName, meetingId} = taskEstimate
 
     //AUTH
-    const [task, meeting] = await Promise.all([
+    const [task, meeting, viewer] = await Promise.all([
       dataLoader.get('tasks').load(taskId),
-      dataLoader.get('newMeetings').load(meetingId)
+      dataLoader.get('newMeetings').load(meetingId),
+      dataLoader.get('users').loadNonNull(viewerId)
     ])
     if (!meeting) {
       return {error: {message: 'Meeting not found'}}
@@ -68,10 +67,10 @@ const setTaskEstimate = {
       return {error: {message: 'Invalid dimension name'}}
     }
 
-    const {phases, meetingType, templateRefId, name: meetingName} = meeting as MeetingPoker
-    if (meetingType !== 'poker') {
+    if (meeting.meetingType !== 'poker') {
       return {error: {message: 'Invalid poker meeting'}}
     }
+    const {phases, templateRefId, name: meetingName} = meeting
     const templateRef = await dataLoader.get('templateRefs').loadNonNull(templateRefId)
     const {dimensions} = templateRef
     const dimensionRefIdx = dimensions.findIndex((dimension) => dimension.name === dimensionName)
@@ -93,6 +92,7 @@ const setTaskEstimate = {
     // RESOLUTION
     let jiraFieldId: string | undefined = undefined
     let githubLabelName: string | undefined = undefined
+    let gitlabLabelId: string | undefined = undefined
     const {integration} = task
     const service = integration?.service
     const stageIdx = stages.findIndex((stage) => stage.id === stageId)
@@ -218,7 +218,7 @@ const setTaskEstimate = {
         ])
 
         if (!auth) {
-          errorMessage = 'User no longer has access to Jira Server'
+          errorMessage = 'User no longer has access to Jira Data Center'
           break
         }
 
@@ -231,7 +231,7 @@ const setTaskEstimate = {
 
         const manager = new JiraServerRestManager(auth, provider as IntegrationProviderJiraServer)
 
-        const {providerId, repositoryId: projectId} = integration as TaskIntegrationJiraServer
+        const {providerId, repositoryId: projectId} = integration!
         const jiraServerIssue = await dataLoader
           .get('jiraServerIssue')
           .load({providerId, teamId, userId: accessUserId, issueId})
@@ -364,6 +364,7 @@ const setTaskEstimate = {
           errorMessage = message
           break
         }
+        gitlabLabelId = gitlabPushRes
         success = true
         break
       }
@@ -373,7 +374,7 @@ const setTaskEstimate = {
       }
     }
 
-    analytics.taskEstimateSet(viewerId, {
+    analytics.taskEstimateSet(viewer, {
       taskId,
       meetingId,
       dimensionName,
@@ -388,6 +389,7 @@ const setTaskEstimate = {
         discussionId,
         jiraFieldId,
         githubLabelName,
+        gitlabLabelId,
         label: value,
         name: dimensionName,
         meetingId,

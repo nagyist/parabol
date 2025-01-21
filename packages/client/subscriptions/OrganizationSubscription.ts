@@ -2,13 +2,13 @@ import graphql from 'babel-plugin-relay/macro'
 import {RouterProps} from 'react-router'
 import {requestSubscription} from 'relay-runtime'
 import {
+  OrganizationSubscription$variables,
+  OrganizationSubscription as TOrganizationSubscription
+} from '~/__generated__/OrganizationSubscription.graphql'
+import {
   archiveOrganizationOrganizationOnNext,
   archiveOrganizationOrganizationUpdater
 } from '~/mutations/ArchiveOrganizationMutation'
-import {
-  OrganizationSubscription as TOrganizationSubscription,
-  OrganizationSubscription$variables
-} from '~/__generated__/OrganizationSubscription.graphql'
 import Atmosphere from '../Atmosphere'
 import {addOrgMutationOrganizationUpdater} from '../mutations/AddOrgMutation'
 import {
@@ -22,12 +22,14 @@ import {
 import {updateTemplateScopeOrganizationUpdater} from '../mutations/UpdateReflectTemplateScopeMutation'
 import subscriptionOnNext from './subscriptionOnNext'
 import subscriptionUpdater from './subscriptionUpdater'
-import upgradeToTeamTierSuccessUpdater from '../mutations/handlers/upgradeToTeamTierSuccessUpdater'
 
 const subscription = graphql`
   subscription OrganizationSubscription {
     organizationSubscription {
       fieldName
+      AddIntegrationProviderSuccess {
+        ...AddIntegrationProviderMutation_organization @relay(mask: false)
+      }
       AddOrgPayload {
         ...AddOrgMutation_organization @relay(mask: false)
       }
@@ -40,7 +42,6 @@ const subscription = graphql`
       OldUpdateCreditCardPayload {
         ...OldUpdateCreditCardMutation_organization @relay(mask: false)
       }
-
       UpdateOrgPayload {
         ...UpdateOrgMutation_organization @relay(mask: false)
       }
@@ -50,11 +51,17 @@ const subscription = graphql`
       UpgradeToTeamTierSuccess {
         ...UpgradeToTeamTierFrag_organization @relay(mask: false)
       }
+      RemoveIntegrationProviderSuccess {
+        ...RemoveIntegrationProviderMutation_organization @relay(mask: false)
+      }
       RemoveOrgUserPayload {
         ...RemoveOrgUserMutation_organization @relay(mask: false)
       }
       SetOrgUserRoleSuccess {
         ...SetOrgUserRoleMutation_organization @relay(mask: false)
+      }
+      UpdateIntegrationProviderSuccess {
+        ...UpdateIntegrationProviderMutation_organization @relay(mask: false)
       }
       UpdateTemplateScopeSuccess {
         ...UpdateReflectTemplateScopeMutation_organization @relay(mask: false)
@@ -72,10 +79,9 @@ const onNextHandlers = {
 const updateHandlers = {
   AddOrgPayload: addOrgMutationOrganizationUpdater,
   ArchiveOrganizationPayload: archiveOrganizationOrganizationUpdater,
-  SetOrgUserRoleSuccess: setOrgUserRoleAddedOrganizationUpdater,
   RemoveOrgUserPayload: removeOrgUserOrganizationUpdater,
-  UpdateTemplateScopeSuccess: updateTemplateScopeOrganizationUpdater,
-  UpgradeToTeamTierSuccess: upgradeToTeamTierSuccessUpdater
+  SetOrgUserRoleSuccess: setOrgUserRoleAddedOrganizationUpdater,
+  UpdateTemplateScopeSuccess: updateTemplateScopeOrganizationUpdater
 } as const
 
 const OrganizationSubscription = (

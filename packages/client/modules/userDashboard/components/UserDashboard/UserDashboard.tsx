@@ -1,4 +1,4 @@
-import React, {lazy} from 'react'
+import {lazy} from 'react'
 import {Route} from 'react-router'
 import {Switch} from 'react-router-dom'
 
@@ -14,9 +14,7 @@ const Organization = lazy(
       /* webpackChunkName: 'OrganizationRoot' */ '../../containers/Organization/OrganizationRoot'
     )
 )
-const UserDashMain = lazy(
-  () => import(/* webpackChunkName: 'UserDashMain' */ '../UserDashMain/UserDashMainRoot')
-)
+const UserDashMain = lazy(() => import(/* webpackChunkName: 'UserDashMain' */ '../UserDashMain'))
 const UserProfile = lazy(
   () => import(/* webpackChunkName: 'UserProfileRoot' */ '../UserProfileRoot')
 )

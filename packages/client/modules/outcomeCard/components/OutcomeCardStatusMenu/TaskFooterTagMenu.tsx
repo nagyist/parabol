@@ -1,8 +1,7 @@
 import graphql from 'babel-plugin-relay/macro'
-import {EditorState} from 'draft-js'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import {AreaEnum} from '~/__generated__/UpdateTaskMutation.graphql'
+import {TaskFooterTagMenu_task$key} from '../../../../__generated__/TaskFooterTagMenu_task.graphql'
 import Menu from '../../../../components/Menu'
 import MenuItem from '../../../../components/MenuItem'
 import MenuItemDot from '../../../../components/MenuItemDot'
@@ -15,10 +14,7 @@ import {UseTaskChild} from '../../../../hooks/useTaskChildFocus'
 import DeleteTaskMutation from '../../../../mutations/DeleteTaskMutation'
 import {PALETTE} from '../../../../styles/paletteV3'
 import {TaskStatus} from '../../../../types/constEnums'
-import addContentTag from '../../../../utils/draftjs/addContentTag'
-import removeContentTag from '../../../../utils/draftjs/removeContentTag'
 import isTaskPrivate from '../../../../utils/isTaskPrivate'
-import {TaskFooterTagMenu_task$key} from '../../../../__generated__/TaskFooterTagMenu_task.graphql'
 import TaskFooterTagMenuStatusItem from './TaskFooterTagMenuStatusItem'
 
 const statusItems = [TaskStatus.DONE, TaskStatus.ACTIVE, TaskStatus.STUCK, TaskStatus.FUTURE]
@@ -26,7 +22,7 @@ const statusItems = [TaskStatus.DONE, TaskStatus.ACTIVE, TaskStatus.STUCK, TaskS
 interface Props {
   area: AreaEnum
   menuProps: MenuProps
-  editorState: EditorState
+  toggleTag: (tag: string) => void
   // TODO make area enum more fine grained to get rid of isAgenda
   isAgenda: boolean
   mutationProps: MenuMutationProps
@@ -35,13 +31,12 @@ interface Props {
 }
 
 const TaskFooterTagMenu = (props: Props) => {
-  const {area, menuProps, editorState, isAgenda, task: taskRef, useTaskChild} = props
+  const {area, menuProps, toggleTag, isAgenda, task: taskRef, useTaskChild} = props
   const task = useFragment(
     graphql`
       fragment TaskFooterTagMenu_task on Task {
         ...TaskFooterTagMenuStatusItem_task
         id
-        content
         status
         tags
       }
@@ -50,13 +45,8 @@ const TaskFooterTagMenu = (props: Props) => {
   )
   useTaskChild('tag')
   const atmosphere = useAtmosphere()
-  const {id: taskId, status: taskStatus, tags, content} = task
+  const {id: taskId, status: taskStatus, tags} = task
   const isPrivate = isTaskPrivate(tags)
-  const handlePrivate = () => {
-    isPrivate
-      ? removeContentTag('private', atmosphere, taskId, content, area)
-      : addContentTag('#private', atmosphere, taskId, editorState.getCurrentContent(), area)
-  }
   return (
     <Menu ariaLabel={'Change the status of the task'} {...menuProps}>
       {statusItems
@@ -81,7 +71,7 @@ const TaskFooterTagMenu = (props: Props) => {
             </span>
           </MenuItemLabel>
         }
-        onClick={handlePrivate}
+        onClick={() => toggleTag('private')}
       />
       {isAgenda ? (
         <MenuItem
@@ -106,9 +96,7 @@ const TaskFooterTagMenu = (props: Props) => {
               </span>
             </MenuItemLabel>
           }
-          onClick={() =>
-            addContentTag('#archived', atmosphere, taskId, editorState.getCurrentContent(), area)
-          }
+          onClick={() => toggleTag('archived')}
         />
       )}
     </Menu>

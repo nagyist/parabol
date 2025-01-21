@@ -1,29 +1,15 @@
-import MeetingSeriesId from 'parabol-client/shared/gqlIds/MeetingSeriesId'
-import {TeamPromptMeetingResolvers} from '../resolverTypes'
-import getRethink from '../../../database/rethinkDriver'
-import MeetingTeamPrompt from '../../../database/types/MeetingTeamPrompt'
+import getKysely from '../../../postgres/getKysely'
+import {getTeamPromptResponsesByMeetingId} from '../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
+import {selectNewMeetings} from '../../../postgres/select'
+import {TeamPromptMeeting as TeamPromptMeetingSource} from '../../../postgres/types/Meeting'
 import {getUserId} from '../../../utils/authorization'
 import filterTasksByMeeting from '../../../utils/filterTasksByMeeting'
-import {RValue} from '../../../database/stricterR'
+import getPhase from '../../../utils/getPhase'
+import isValid from '../../isValid'
+import {TeamPromptMeetingResolvers} from '../resolverTypes'
 
 const TeamPromptMeeting: TeamPromptMeetingResolvers = {
-  meetingSeriesId: ({meetingSeriesId}, _args, _context) => {
-    if (meetingSeriesId) {
-      return MeetingSeriesId.join(meetingSeriesId)
-    }
-
-    return null
-  },
-  meetingSeries: async ({meetingSeriesId}, _args, {dataLoader}) => {
-    if (!meetingSeriesId) return null
-
-    const series = await dataLoader.get('meetingSeries').load(meetingSeriesId)
-    if (!series) {
-      return null
-    }
-
-    return series
-  },
+  __isTypeOf: ({meetingType}) => meetingType === 'teamPrompt',
   prevMeeting: async ({meetingSeriesId, createdAt}, _args, {dataLoader}) => {
     if (!meetingSeriesId) return null
 
@@ -32,17 +18,15 @@ const TeamPromptMeeting: TeamPromptMeetingResolvers = {
       return null
     }
 
-    const r = await getRethink()
-    const meetings = await r
-      .table('NewMeeting')
-      .getAll(meetingSeriesId, {index: 'meetingSeriesId'})
-      .filter({meetingType: 'teamPrompt'})
-      .filter((row: RValue) => row('createdAt').lt(createdAt))
-      .orderBy(r.desc('createdAt'))
+    const meeting = await selectNewMeetings()
+      .where('meetingSeriesId', '=', meetingSeriesId)
+      .where('meetingType', '=', 'teamPrompt')
+      .where('createdAt', '<', createdAt)
+      .orderBy('createdAt desc')
       .limit(1)
-      .run()
-
-    return meetings[0] as MeetingTeamPrompt
+      .$narrowType<TeamPromptMeetingSource>()
+      .executeTakeFirst()
+    return meeting || null
   },
   nextMeeting: async ({meetingSeriesId, createdAt}, _args, {dataLoader}) => {
     if (!meetingSeriesId) return null
@@ -51,25 +35,70 @@ const TeamPromptMeeting: TeamPromptMeetingResolvers = {
     if (!series || series.cancelledAt) {
       return null
     }
-
-    const r = await getRethink()
-    const meetings = await r
-      .table('NewMeeting')
-      .getAll(meetingSeriesId, {index: 'meetingSeriesId'})
-      .filter({meetingType: 'teamPrompt'})
-      .filter((doc: RValue) => doc('createdAt').gt(createdAt))
-      .orderBy(r.asc('createdAt'))
+    const meeting = await selectNewMeetings()
+      .where('meetingSeriesId', '=', meetingSeriesId)
+      .where('meetingType', '=', 'teamPrompt')
+      .where('createdAt', '>', createdAt)
+      .orderBy('createdAt asc')
       .limit(1)
-      .run()
-
-    return meetings[0] as MeetingTeamPrompt
+      .$narrowType<TeamPromptMeetingSource>()
+      .executeTakeFirst()
+    return meeting || null
   },
   tasks: async ({id: meetingId}, _args: unknown, {authToken, dataLoader}) => {
     const viewerId = getUserId(authToken)
-    const meeting = await dataLoader.get('newMeetings').load(meetingId)
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
     const {teamId} = meeting
     const teamTasks = await dataLoader.get('tasksByTeamId').load(teamId)
     return filterTasksByMeeting(teamTasks, meetingId, viewerId)
+  },
+
+  settings: async ({teamId}, _args, {dataLoader}) => {
+    return await dataLoader.get('meetingSettingsByType').load({teamId, meetingType: 'teamPrompt'})
+  },
+
+  responses: ({id: meetingId}, _args) => {
+    return getTeamPromptResponsesByMeetingId(meetingId)
+  },
+
+  responseCount: async ({id: meetingId}) => {
+    return (await getTeamPromptResponsesByMeetingId(meetingId)).filter(
+      (response) => !!response.plaintextContent
+    ).length
+  },
+
+  taskCount: async ({id: meetingId}, _args, {dataLoader}) => {
+    const pg = getKysely()
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
+    if (meeting.meetingType !== 'teamPrompt') {
+      return 0
+    }
+    const {phases} = meeting
+    const discussPhase = getPhase(phases, 'RESPONSES')
+    const {stages} = discussPhase
+    const discussionIds = stages.map((stage) => stage.discussionId)
+    const taskCountRes = await pg
+      .selectFrom('Task')
+      .select(({fn}) => fn.count<bigint>('id').as('count'))
+      .where('discussionId', 'in', discussionIds)
+      .executeTakeFirst()
+    return Number(taskCountRes?.count ?? 0)
+  },
+
+  commentCount: async ({id: meetingId}, _args, {dataLoader}) => {
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
+    if (meeting.meetingType !== 'teamPrompt') {
+      return 0
+    }
+    const {phases} = meeting
+    const discussPhase = getPhase(phases, 'RESPONSES')
+    const {stages} = discussPhase
+    const discussionIds = stages.map((stage) => stage.discussionId)
+    const commentCounts = (
+      await dataLoader.get('commentCountByDiscussionId').loadMany(discussionIds)
+    ).filter(isValid)
+    const commentCount = commentCounts.reduce((cumSum, count) => cumSum + count, 0)
+    return commentCount
   }
 }
 

@@ -1,8 +1,8 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {handleSuccessfulLogin} from '~/utils/handleSuccessfulLogin'
-import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {LoginWithPasswordMutation as TLoginWithPasswordMutation} from '../__generated__/LoginWithPasswordMutation.graphql'
+import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {handleAcceptTeamInvitationErrors} from './AcceptTeamInvitationMutation'
 import handleAuthenticationRedirect from './handlers/handleAuthenticationRedirect'
 
@@ -40,7 +40,7 @@ const LoginWithPasswordMutation: StandardMutation<
       handleAcceptTeamInvitationErrors(atmosphere, acceptTeamInvitation)
       if (!uiError && !errors) {
         handleSuccessfulLogin(loginWithPassword)
-        const authToken = acceptTeamInvitation?.authToken ?? loginWithPassword.authToken
+        const authToken = acceptTeamInvitation?.authToken || loginWithPassword.authToken!
         atmosphere.setAuthToken(authToken)
         handleAuthenticationRedirect(acceptTeamInvitation, {atmosphere, history})
       }

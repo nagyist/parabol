@@ -1,17 +1,17 @@
 import styled from '@emotion/styled'
-import React from 'react'
 import useCanonical from '~/hooks/useCanonical'
 import useAtmosphere from '../hooks/useAtmosphere'
-import useDocumentTitle from '../hooks/useDocumentTitle'
 import useRouter from '../hooks/useRouter'
 import getValidRedirectParam from '../utils/getValidRedirectParam'
+import {AUTH_DIALOG_WIDTH} from './AuthenticationDialog'
 import GenericAuthentication, {AuthPageSlug, GotoAuthPage} from './GenericAuthentication'
 import TeamInvitationWrapper from './TeamInvitationWrapper'
 
 const CopyBlock = styled('div')({
   marginBottom: 48,
   width: 'calc(100vw - 16px)',
-  maxWidth: 500,
+  // must be no wider than the auth popup width to keep it looking clean
+  maxWidth: AUTH_DIALOG_WIDTH,
   textAlign: 'center'
 })
 
@@ -24,7 +24,6 @@ const AuthenticationPage = (props: Props) => {
   const {page} = props
   const atmosphere = useAtmosphere()
   const {authObj} = atmosphere
-  useDocumentTitle('Sign Up for Free Online Retrospectives | Parabol', 'Sign Up')
   useCanonical(page)
   if (authObj) {
     const nextUrl = getValidRedirectParam() || '/meetings'
@@ -49,5 +48,4 @@ const AuthenticationPage = (props: Props) => {
     </TeamInvitationWrapper>
   )
 }
-
 export default AuthenticationPage

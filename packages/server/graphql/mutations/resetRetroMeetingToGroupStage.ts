@@ -1,11 +1,10 @@
 import {GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import {CHECKIN, DISCUSS, GROUP, REFLECT, VOTE} from '../../../client/utils/constants'
-import getRethink from '../../database/rethinkDriver'
 import DiscussPhase from '../../database/types/DiscussPhase'
 import GenericMeetingPhase from '../../database/types/GenericMeetingPhase'
-import MeetingRetrospective from '../../database/types/MeetingRetrospective'
 import getKysely from '../../postgres/getKysely'
+import {RetroMeetingPhase} from '../../postgres/types/NewMeetingPhase'
 import {getUserId} from '../../utils/authorization'
 import getPhase from '../../utils/getPhase'
 import publish from '../../utils/publish'
@@ -27,14 +26,13 @@ const resetRetroMeetingToGroupStage = {
     {meetingId}: {meetingId: string},
     {authToken, socketId: mutatorId, dataLoader}: GQLContext
   ) => {
-    const r = await getRethink()
     const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
     // AUTH
     const viewerId = getUserId(authToken)
-    const meeting = (await dataLoader.get('newMeetings').load(meetingId)) as MeetingRetrospective
+    const meeting = await dataLoader.get('newMeetings').load(meetingId)
     if (!meeting) return standardError(new Error('Meeting not found'), {userId: viewerId})
     const {createdBy, facilitatorUserId, phases, meetingType} = meeting
     if (meetingType !== 'retrospective') {
@@ -91,7 +89,7 @@ const resetRetroMeetingToGroupStage = {
         default:
           throw new Error(`Unhandled phaseType: ${phase.phaseType}`)
       }
-    })
+    }) as RetroMeetingPhase[]
 
     primePhases(newPhases, resetToPhaseIndex)
     meeting.phases = newPhases
@@ -103,27 +101,39 @@ const resetRetroMeetingToGroupStage = {
     // bc we return the reflection groups cached by data loader in the fragment
     reflectionGroups.forEach((rg) => (rg.voterIds = []))
 
-    await Promise.all([
-      r
-        .table('Comment')
-        .getAll(r.args(discussionIdsToDelete), {index: 'discussionId'})
-        .delete()
-        .run(),
-      r.table('Task').getAll(r.args(discussionIdsToDelete), {index: 'discussionId'}).delete().run(),
-      pg
+    if (discussionIdsToDelete.length > 0) {
+      await pg
+        .with('DeleteComments', (qb) =>
+          qb.deleteFrom('Comment').where('discussionId', 'in', discussionIdsToDelete)
+        )
+        .deleteFrom('Task')
+        .where('discussionId', 'in', discussionIdsToDelete)
+        .execute()
+    }
+    if (reflectionGroupIds.length > 0) {
+      await pg
         .updateTable('RetroReflectionGroup')
-        .set({voterIds: [], summary: null, discussionPromptQuestion: null})
+        .set({voterIds: [], discussionPromptQuestion: null})
         .where('id', 'in', reflectionGroupIds)
-        .execute(),
-      r
-        .table('RetroReflectionGroup')
-        .getAll(r.args(reflectionGroupIds))
-        .update({voterIds: [], summary: null, discussionPromptQuestion: null})
-        .run(),
-      r.table('NewMeeting').get(meetingId).update({phases: newPhases}).run(),
-      (r.table('MeetingMember').getAll(meetingId, {index: 'meetingId'}) as any)
-        .update({votesRemaining: meeting.totalVotes})
-        .run()
+        .execute()
+    }
+    await pg
+      .with('ResetMeetingMember', (qb) =>
+        qb
+          .updateTable('MeetingMember')
+          .set({votesRemaining: meeting.totalVotes})
+          .where('meetingId', '=', meetingId)
+      )
+      .updateTable('NewMeeting')
+      .set({phases: JSON.stringify(newPhases)})
+      .where('id', '=', meetingId)
+      .execute()
+    dataLoader.clearAll([
+      'newMeetings',
+      'comments',
+      'retroReflectionGroups',
+      'tasks',
+      'meetingMembers'
     ])
     const data = {
       meetingId

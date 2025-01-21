@@ -1,12 +1,12 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect} from 'react'
+import {useEffect} from 'react'
 import {useFragment} from 'react-relay'
 import {PromptToJoinOrgNotification_notification$key} from '~/__generated__/PromptToJoinOrgNotification_notification.graphql'
+import useAtmosphere from '../hooks/useAtmosphere'
+import RequestToJoinDomainMutation from '../mutations/RequestToJoinDomainMutation'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 import NotificationAction from './NotificationAction'
 import NotificationTemplate from './NotificationTemplate'
-import useAtmosphere from '../hooks/useAtmosphere'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
-import RequestToJoinDomainMutation from '../mutations/RequestToJoinDomainMutation'
 
 interface Props {
   notification: PromptToJoinOrgNotification_notification$key
@@ -29,7 +29,7 @@ const PromptToJoinOrgNotification = (props: Props) => {
   const {activeDomain, type} = notification
 
   useEffect(() => {
-    SendClientSegmentEventMutation(atmosphere, 'Notification Viewed', {
+    SendClientSideEvent(atmosphere, 'Notification Viewed', {
       notificationType: type
     })
   }, [])

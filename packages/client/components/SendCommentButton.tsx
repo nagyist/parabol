@@ -1,8 +1,6 @@
 import styled from '@emotion/styled'
 import {ArrowUpward} from '@mui/icons-material'
-import React from 'react'
 import {PALETTE} from '~/styles/paletteV3'
-import isAndroid from '~/utils/draftjs/isAndroid'
 import {MenuPosition} from '../hooks/useCoords'
 import useTooltip from '../hooks/useTooltip'
 import PlainButton from './PlainButton/PlainButton'
@@ -44,11 +42,10 @@ const SendIcon = styled(ArrowUpward, {
 interface Props {
   commentSubmitState: CommentSubmitState
   onSubmit: () => void
-  dataCy: string
 }
 
 const SendCommentButton = (props: Props) => {
-  const {commentSubmitState, onSubmit, dataCy} = props
+  const {commentSubmitState, onSubmit} = props
   const {
     tooltipPortal,
     openTooltip,
@@ -58,18 +55,10 @@ const SendCommentButton = (props: Props) => {
 
   const isDisabled = commentSubmitState === 'idle'
 
-  const handleTouched = (e: React.TouchEvent) => {
-    if (!isAndroid) return
-    e.preventDefault()
-    onSubmit()
-  }
-
   return (
     <>
       <StyledPlainButton
-        data-cy={`${dataCy}-send`}
         onClick={onSubmit}
-        onTouchEnd={handleTouched}
         onMouseEnter={openTooltip}
         onMouseLeave={closeTooltip}
         commentSubmitState={commentSubmitState}

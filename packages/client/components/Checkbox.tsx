@@ -1,6 +1,6 @@
 import {CheckBox, CheckBoxOutlineBlank, IndeterminateCheckBox} from '@mui/icons-material'
-import React from 'react'
 import clsx from 'clsx'
+import * as React from 'react'
 
 interface Props {
   active: boolean | null

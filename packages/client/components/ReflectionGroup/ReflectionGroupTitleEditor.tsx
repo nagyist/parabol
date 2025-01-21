@@ -1,7 +1,10 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {RefObject, useRef} from 'react'
+import * as React from 'react'
+import {RefObject, useRef} from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
+import {ReflectionGroupTitleEditor_meeting$key} from '../../__generated__/ReflectionGroupTitleEditor_meeting.graphql'
+import {ReflectionGroupTitleEditor_reflectionGroup$key} from '../../__generated__/ReflectionGroupTitleEditor_reflectionGroup.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
 import useMutationProps from '../../hooks/useMutationProps'
 import UpdateReflectionGroupTitleMutation from '../../mutations/UpdateReflectionGroupTitleMutation'
@@ -9,8 +12,7 @@ import {PALETTE} from '../../styles/paletteV3'
 import ui from '../../styles/ui'
 import {Card} from '../../types/constEnums'
 import {RETRO_TOPIC_LABEL} from '../../utils/constants'
-import {ReflectionGroupTitleEditor_meeting$key} from '../../__generated__/ReflectionGroupTitleEditor_meeting.graphql'
-import {ReflectionGroupTitleEditor_reflectionGroup$key} from '../../__generated__/ReflectionGroupTitleEditor_reflectionGroup.graphql'
+import Ellipsis from '../Ellipsis/Ellipsis'
 import StyledError from '../StyledError'
 
 interface Props {
@@ -77,7 +79,7 @@ const NameInput = styled('input')<{isExpanded: boolean; readOnly: boolean}>(
 
 const getValidationError = (
   title: string | null,
-  reflectionGroups: readonly {id: string; title: string | null}[],
+  reflectionGroups: readonly {id: string; title: string | null | undefined}[],
   reflectionGroupId: string
 ) => {
   if (!title || title.length < 1) {
@@ -127,7 +129,10 @@ const ReflectionGroupTitleEditor = (props: Props) => {
   const dirtyRef = useRef(false)
   const initialTitleRef = useRef(title)
 
+  const isLoading = title === '' && !dirtyRef.current
+
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    dirtyRef.current = true
     const title = e.target.value
     commitLocalUpdate(atmosphere, (store) => {
       const reflectionGroup = store.get(reflectionGroupId)
@@ -177,19 +182,25 @@ const ReflectionGroupTitleEditor = (props: Props) => {
     <InputWithIconWrap>
       <RootBlock data-cy='group-title-editor'>
         <FormBlock onSubmit={onSubmit}>
-          <NameInput
-            data-cy='group-title-editor-input'
-            isExpanded={isExpanded}
-            onBlur={onSubmit}
-            onChange={onChange}
-            onKeyPress={onKeyPress}
-            placeholder={RETRO_TOPIC_LABEL}
-            readOnly={readOnly}
-            ref={titleInputRef}
-            maxLength={200}
-            type='text'
-            value={title || ''}
-          />
+          {isLoading ? (
+            <span className='inline-block text-left font-semibold'>
+              <Ellipsis />
+            </span>
+          ) : (
+            <NameInput
+              data-cy='group-title-editor-input'
+              isExpanded={isExpanded}
+              onBlur={onSubmit}
+              onChange={onChange}
+              onKeyPress={onKeyPress}
+              placeholder={RETRO_TOPIC_LABEL}
+              readOnly={readOnly}
+              ref={titleInputRef}
+              maxLength={200}
+              type='text'
+              value={title || ''}
+            />
+          )}
         </FormBlock>
         {error && <StyledError>{error.message}</StyledError>}
       </RootBlock>

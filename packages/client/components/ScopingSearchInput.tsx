@@ -1,11 +1,12 @@
 import styled from '@emotion/styled'
 import {Close} from '@mui/icons-material'
-import React, {useEffect, useRef} from 'react'
+import * as React from 'react'
+import {useEffect, useRef} from 'react'
 import {commitLocalUpdate} from 'react-relay'
+import {TaskServiceEnum} from '../__generated__/CreateTaskMutation.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
 import {PALETTE} from '../styles/paletteV3'
-import {TaskServiceEnum} from '../__generated__/SendClientSegmentEventMutation.graphql'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 
 const SearchInput = styled('input')({
   appearance: 'none',
@@ -64,7 +65,7 @@ const ScopingSearchInput = (props: Props) => {
   }, [])
 
   const trackEvent = (eventTitle: string) => {
-    SendClientSegmentEventMutation(atmosphere, eventTitle, {
+    SendClientSideEvent(atmosphere, eventTitle, {
       meetingId,
       service
     })

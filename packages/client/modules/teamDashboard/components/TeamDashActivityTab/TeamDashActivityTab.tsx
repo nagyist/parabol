@@ -1,12 +1,10 @@
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import {TeamDashActivityTab_team$key} from '~/__generated__/TeamDashActivityTab_team.graphql'
-import useTransition from '../../../../hooks/useTransition'
-import MeetingCard from '../../../../components/MeetingCard'
 import DemoMeetingCard from '../../../../components/DemoMeetingCard'
+import MeetingCard from '../../../../components/MeetingCard'
 import TutorialMeetingCard from '../../../../components/TutorialMeetingCard'
-import TeamDashInsights from '../TeamDashInsights/TeamDashInsights'
+import useTransition from '../../../../hooks/useTransition'
 
 interface Props {
   teamRef: TeamDashActivityTab_team$key
@@ -21,16 +19,12 @@ const TeamDashActivityTab = (props: Props) => {
           id
           ...MeetingCard_meeting
         }
-        insights {
-          id
-          ...TeamDashInsights_insights
-        }
       }
     `,
     teamRef
   )
 
-  const {activeMeetings, insights} = team
+  const {activeMeetings} = team
   const transitioningMeetings = useTransition(
     activeMeetings.map((meeting, displayIdx) => ({
       ...meeting,
@@ -65,16 +59,12 @@ const TeamDashActivityTab = (props: Props) => {
         ) : (
           <>
             <DemoMeetingCard />
+            <TutorialMeetingCard type='retro' />
             <TutorialMeetingCard type='standup' />
             <TutorialMeetingCard type='poker' />
           </>
         )}
       </div>
-      {insights && (
-        <div className='flex w-full flex-wrap pr-4'>
-          <TeamDashInsights teamInsightsRef={insights} />
-        </div>
-      )}
     </div>
   )
 }

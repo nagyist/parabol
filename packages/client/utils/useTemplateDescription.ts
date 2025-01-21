@@ -1,13 +1,11 @@
 import graphql from 'babel-plugin-relay/macro'
 import {readInlineData} from 'react-relay'
 import {useTemplateDescription_template$key} from '../__generated__/useTemplateDescription_template.graphql'
-import {TierEnum} from '../__generated__/SendClientSegmentEventMutation.graphql'
 import relativeDate from './date/relativeDate'
 
 const useTemplateDescription = (
   lowestScope: string,
-  templateRef?: useTemplateDescription_template$key,
-  tier?: TierEnum
+  templateRef?: useTemplateDescription_template$key
 ) => {
   if (!templateRef) {
     return null
@@ -18,7 +16,6 @@ const useTemplateDescription = (
       fragment useTemplateDescription_template on MeetingTemplate @inline {
         lastUsedAt
         scope
-        isFree
         team {
           name
         }
@@ -27,10 +24,10 @@ const useTemplateDescription = (
     templateRef
   )
 
-  const {lastUsedAt, team, isFree} = template
+  const {lastUsedAt, team} = template
   const {name: teamName} = team
   if (lowestScope === 'PUBLIC') {
-    return isFree ? 'Free template' : `Premium template ${tier === 'starter' ? '🔒' : '✨'}`
+    return 'Public template'
   }
   if (lowestScope === 'TEAM')
     return lastUsedAt

@@ -1,10 +1,9 @@
 import graphql from 'babel-plugin-relay/macro'
+import {TeamHealthSummary_meeting$key} from 'parabol-client/__generated__/TeamHealthSummary_meeting.graphql'
 import {PALETTE} from 'parabol-client/styles/paletteV3'
 import {FONT_FAMILY} from 'parabol-client/styles/typographyV2'
-import {TeamHealthSummary_meeting$key} from 'parabol-client/__generated__/TeamHealthSummary_meeting.graphql'
-import React from 'react'
-import {useFragment} from 'react-relay'
 import getTeamHealthVoteColor from 'parabol-client/utils/getTeamHealthVoteColor'
+import {useFragment} from 'react-relay'
 
 interface Props {
   meeting: TeamHealthSummary_meeting$key

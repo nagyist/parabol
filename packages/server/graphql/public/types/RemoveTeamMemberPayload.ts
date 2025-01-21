@@ -1,5 +1,5 @@
 import nullIfEmpty from 'parabol-client/utils/nullIfEmpty'
-import NotificationKickedOut from '../../../database/types/NotificationKickedOut'
+import {KickedOutNotification} from '../../../postgres/types/Notification'
 import {getUserId} from '../../../utils/authorization'
 import {GQLContext} from '../../graphql'
 import isValid from '../../isValid'
@@ -15,7 +15,7 @@ export type RemoveTeamMemberPayloadSource = {
 
 const RemoveTeamMemberPayload: RemoveTeamMemberPayloadResolvers = {
   teamMember: async ({teamMemberId}, _args, {dataLoader}: GQLContext) => {
-    return dataLoader.get('teamMembers').load(teamMemberId)
+    return dataLoader.get('teamMembers').loadNonNull(teamMemberId)
   },
   team: async ({teamId}, _args, {dataLoader}) => {
     return dataLoader.get('teams').loadNonNull(teamId)
@@ -38,9 +38,11 @@ const RemoveTeamMemberPayload: RemoveTeamMemberPayloadResolvers = {
   kickOutNotification: async ({notificationId}, _args, {authToken, dataLoader}) => {
     if (!notificationId) return null
     const viewerId = getUserId(authToken)
-    const notification = await dataLoader.get('notifications').load(notificationId)
+    const notification = await dataLoader
+      .get('notifications')
+      .load<KickedOutNotification>(notificationId)
     if (!notification || notification.userId !== viewerId) return null
-    return notification as NotificationKickedOut
+    return notification
   }
 }
 

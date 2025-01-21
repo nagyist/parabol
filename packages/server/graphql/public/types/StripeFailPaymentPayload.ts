@@ -1,4 +1,4 @@
-import NotificationPaymentRejected from '../../../database/types/NotificationPaymentRejected'
+import {PaymentRejectedNotification} from '../../../postgres/types/Notification'
 import {StripeFailPaymentPayloadResolvers} from '../resolverTypes'
 
 export type StripeFailPaymentPayloadSource = {
@@ -8,11 +8,13 @@ export type StripeFailPaymentPayloadSource = {
 
 const StripeFailPaymentPayload: StripeFailPaymentPayloadResolvers = {
   organization: ({orgId}, _args, {dataLoader}) => {
-    return dataLoader.get('organizations').load(orgId)
+    return dataLoader.get('organizations').loadNonNull(orgId)
   },
   notification: async ({notificationId}, _args, {dataLoader}) => {
-    const notification = await dataLoader.get('notifications').load(notificationId)
-    return notification as NotificationPaymentRejected
+    const notification = await dataLoader
+      .get('notifications')
+      .loadNonNull<PaymentRejectedNotification>(notificationId)
+    return notification
   }
 }
 

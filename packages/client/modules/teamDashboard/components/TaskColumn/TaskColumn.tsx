@@ -1,15 +1,16 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {Droppable, DroppableProvided, DroppableStateSnapshot} from 'react-beautiful-dnd'
 import {useFragment} from 'react-relay'
 import {TaskColumn_teams$key} from '~/__generated__/TaskColumn_teams.graphql'
 import {AreaEnum, TaskStatusEnum} from '~/__generated__/UpdateTaskMutation.graphql'
+import {TaskColumn_tasks$key} from '../../../../__generated__/TaskColumn_tasks.graphql'
+import useModal from '../../../../hooks/useModal'
 import {PALETTE} from '../../../../styles/paletteV3'
 import {BezierCurve, DroppableType} from '../../../../types/constEnums'
-import {TEAM_DASH, USER_DASH} from '../../../../utils/constants'
+import {DONE, TEAM_DASH, USER_DASH} from '../../../../utils/constants'
 import {taskStatusLabels} from '../../../../utils/taskStatus'
-import {TaskColumn_tasks$key} from '../../../../__generated__/TaskColumn_tasks.graphql'
+import ArchiveAllDoneTasksModal from './ArchiveAllDoneTasksModal'
 import TaskColumnAddTask from './TaskColumnAddTask'
 import TaskColumnInner from './TaskColumnInner'
 
@@ -27,7 +28,8 @@ const ColumnHeader = styled('div')({
   display: 'flex !important',
   lineHeight: '24px',
   padding: 12,
-  position: 'relative'
+  position: 'relative',
+  minWidth: '256px'
 })
 
 const ColumnBody = styled('div')({
@@ -65,7 +67,7 @@ interface Props {
   tasks: TaskColumn_tasks$key
   status: TaskStatusEnum
   teamMemberFilterId?: string | null
-  teams: TaskColumn_teams$key | null
+  teams: TaskColumn_teams$key | null | undefined
 }
 
 const TaskColumn = (props: Props) => {
@@ -101,6 +103,7 @@ const TaskColumn = (props: Props) => {
   )
   const label = taskStatusLabels[status]
   const userCanAdd = area === TEAM_DASH || area === USER_DASH || isViewerMeetingSection
+  const {togglePortal, modalPortal} = useModal()
   return (
     <Droppable droppableId={status} type={DroppableType.TASK}>
       {(dropProvided: DroppableProvided, dropSnapshot: DroppableStateSnapshot) => (
@@ -119,7 +122,18 @@ const TaskColumn = (props: Props) => {
             <StatusLabelBlock userCanAdd={userCanAdd}>
               <StatusLabel>{label}</StatusLabel>
               {tasks.length > 0 && <TasksCount>{tasks.length}</TasksCount>}
+              {status === DONE && (
+                <a onClick={togglePortal} className='ml-auto cursor-pointer text-sm text-slate-600'>
+                  Archive all
+                </a>
+              )}
             </StatusLabelBlock>
+            {modalPortal(
+              <ArchiveAllDoneTasksModal
+                closeModal={togglePortal}
+                taskIds={tasks.map((t) => t.id)}
+              />
+            )}
           </ColumnHeader>
           <ColumnBody {...dropProvided.droppableProps} ref={dropProvided.innerRef}>
             <TaskColumnInner

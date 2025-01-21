@@ -1,24 +1,25 @@
+import {generateText} from '@tiptap/core'
 import {GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import extractTextFromDraftString from 'parabol-client/utils/draftjs/extractTextFromDraftString'
 import isPhaseComplete from 'parabol-client/utils/meetings/isPhaseComplete'
 import getGroupSmartTitle from 'parabol-client/utils/smartGroup/getGroupSmartTitle'
 import unlockAllStagesForPhase from 'parabol-client/utils/unlockAllStagesForPhase'
-import normalizeRawDraftJS from 'parabol-client/validation/normalizeRawDraftJS'
-import getRethink from '../../database/rethinkDriver'
-import Reflection from '../../database/types/Reflection'
+import {serverTipTapExtensions} from '../../../client/shared/tiptap/serverTipTapExtensions'
 import ReflectionGroup from '../../database/types/ReflectionGroup'
 import generateUID from '../../generateUID'
 import getKysely from '../../postgres/getKysely'
+import {toGoogleAnalyzedEntity} from '../../postgres/helpers/toGoogleAnalyzedEntity'
+import {analytics} from '../../utils/analytics/analytics'
 import {getUserId} from '../../utils/authorization'
+import {convertToTipTap} from '../../utils/convertToTipTap'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
 import CreateReflectionInput, {CreateReflectionInputType} from '../types/CreateReflectionInput'
 import CreateReflectionPayload from '../types/CreateReflectionPayload'
+import {getFeatureTier} from '../types/helpers/getFeatureTier'
 import getReflectionEntities from './helpers/getReflectionEntities'
 import getReflectionSentimentScore from './helpers/getReflectionSentimentScore'
-import {analytics} from '../../utils/analytics/analytics'
 
 export default {
   type: CreateReflectionPayload,
@@ -33,53 +34,60 @@ export default {
     {input}: {input: CreateReflectionInputType},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
     const pg = getKysely()
     const operationId = dataLoader.share()
-    const now = new Date()
     const subOptions = {operationId, mutatorId}
     const {content, sortOrder, meetingId, promptId} = input
     // AUTH
     const viewerId = getUserId(authToken)
-    const reflectPrompt = await dataLoader.get('reflectPrompts').load(promptId)
+    const [reflectPrompt, meeting, viewer] = await Promise.all([
+      dataLoader.get('reflectPrompts').load(promptId),
+      dataLoader.get('newMeetings').load(meetingId),
+      dataLoader.get('users').loadNonNull(viewerId)
+    ])
     if (!reflectPrompt) {
       return standardError(new Error('Category not found'), {userId: viewerId})
     }
     const {question} = reflectPrompt
-    const meeting = await r.table('NewMeeting').get(meetingId).default(null).run()
     if (!meeting) return standardError(new Error('Meeting not found'), {userId: viewerId})
     const {endedAt, phases, teamId} = meeting
     if (endedAt) {
       return {error: {message: 'Meeting already ended'}}
     }
     const team = await dataLoader.get('teams').loadNonNull(teamId)
-    const {tier} = team
     if (isPhaseComplete('group', phases)) {
       return standardError(new Error('Meeting phase already completed'), {userId: viewerId})
     }
 
     // VALIDATION
-    const normalizedContent = normalizeRawDraftJS(content)
+    if (content && content.length > 2000) {
+      return {error: {message: 'Reflection content is too long'}}
+    }
+
+    const normalizedContent = convertToTipTap(content)
 
     // RESOLUTION
-    const plaintextContent = extractTextFromDraftString(normalizedContent)
+    const plaintextContent = generateText(normalizedContent, serverTipTapExtensions)
+
     const [entities, sentimentScore] = await Promise.all([
       getReflectionEntities(plaintextContent),
-      tier !== 'starter' ? getReflectionSentimentScore(question, plaintextContent) : undefined
+      getFeatureTier(team) !== 'starter'
+        ? getReflectionSentimentScore(question, plaintextContent)
+        : undefined
     ])
     const reflectionGroupId = generateUID()
 
-    const reflection = new Reflection({
+    const reflection = {
+      id: generateUID(),
       creatorId: viewerId,
-      content: normalizedContent,
+      content: JSON.stringify(normalizedContent),
       plaintextContent,
       entities,
       sentimentScore,
       meetingId,
       promptId,
-      reflectionGroupId,
-      updatedAt: now
-    })
+      reflectionGroupId
+    }
 
     const smartTitle = getGroupSmartTitle([reflection])
     const reflectionGroup = new ReflectionGroup({
@@ -91,11 +99,11 @@ export default {
       sortOrder
     })
 
-    await Promise.all([
-      pg.insertInto('RetroReflectionGroup').values(reflectionGroup).execute(),
-      r.table('RetroReflectionGroup').insert(reflectionGroup).run(),
-      r.table('RetroReflection').insert(reflection).run()
-    ])
+    await pg
+      .with('Group', (qc) => qc.insertInto('RetroReflectionGroup').values(reflectionGroup))
+      .insertInto('RetroReflection')
+      .values({...reflection, entities: toGoogleAnalyzedEntity(entities)})
+      .execute()
 
     const groupPhase = phases.find((phase) => phase.phaseType === 'group')!
     const {stages} = groupPhase
@@ -104,15 +112,14 @@ export default {
     let unlockedStageIds
     if (!groupStage?.isNavigableByFacilitator) {
       unlockedStageIds = unlockAllStagesForPhase(phases, 'group', true)
-      await r
-        .table('NewMeeting')
-        .get(meetingId)
-        .update({
-          phases
-        })
-        .run()
+      await pg
+        .updateTable('NewMeeting')
+        .set({phases: JSON.stringify(phases)})
+        .where('id', '=', meetingId)
+        .execute()
+      dataLoader.clearAll('newMeetings')
     }
-    analytics.reflectionAdded(viewerId, teamId, meetingId)
+    analytics.reflectionAdded(viewer, teamId, meetingId)
     const data = {
       meetingId,
       reflectionId: reflection.id,

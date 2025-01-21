@@ -1,10 +1,6 @@
 import {GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import removeEntityKeepText from 'parabol-client/utils/draftjs/removeEntityKeepText'
-import getRethink from '../../database/rethinkDriver'
-import {RValue} from '../../database/stricterR'
-import Task from '../../database/types/Task'
-import generateUID from '../../generateUID'
+import getKysely from '../../postgres/getKysely'
 import {AtlassianAuth} from '../../postgres/queries/getAtlassianAuthByUserIdTeamId'
 import {GitHubAuth} from '../../postgres/queries/getGitHubAuthByUserIdTeamId'
 import upsertAtlassianAuths from '../../postgres/queries/upsertAtlassianAuths'
@@ -35,8 +31,7 @@ export default {
     {taskId, teamId}: {taskId: string; teamId: string},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
-    const now = new Date()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
@@ -45,11 +40,11 @@ export default {
     if (!isTeamMember(authToken, teamId)) {
       return standardError(new Error('Team not found'), {userId: viewerId})
     }
-    const task = await r.table('Task').get(taskId).run()
+    const task = await dataLoader.get('tasks').load(taskId)
     if (!task) {
       return standardError(new Error('Task not found'), {userId: viewerId})
     }
-    const {content, tags, teamId: oldTeamId} = task
+    const {tags, teamId: oldTeamId} = task
     if (!isTeamMember(authToken, oldTeamId)) {
       return standardError(new Error('Team not found'), {userId: viewerId})
     }
@@ -76,8 +71,8 @@ export default {
         task.integration?.service === 'jira'
           ? await Promise.all(authKeys.map((key) => dataLoader.get('freshAtlassianAuth').load(key)))
           : task.integration?.service === 'github'
-          ? await Promise.all(authKeys.map((key) => dataLoader.get('githubAuth').load(key)))
-          : authKeys.map(() => null)
+            ? await Promise.all(authKeys.map((key) => dataLoader.get('githubAuth').load(key)))
+            : authKeys.map(() => null)
 
       if (!targetTeamAuth && !sourceTeamAuth && !accessUsersTargetTeamAuth) {
         return standardError(new Error('No valid integration found'), {
@@ -125,66 +120,36 @@ export default {
     ).filter(isValid)
     const oldTeamMembers = teamMemberRes[0]!
     const newTeamMembers = teamMemberRes[1]!
-    const oldTeamUserIds = oldTeamMembers.map(({userId}) => userId)
-    const newTeamUserIds = newTeamMembers.map(({userId}) => userId)
-    const userIdsOnlyOnOldTeam = oldTeamUserIds.filter((oldTeamUserId) => {
-      return !newTeamUserIds.find((newTeamUserId) => newTeamUserId === oldTeamUserId)
-    })
-    const rawContent = JSON.parse(content)
-    const eqFn = (entity: {type: string; data: {userId?: string}}) =>
-      entity.type === 'MENTION' &&
-      Boolean(userIdsOnlyOnOldTeam.find((userId) => userId === entity.data.userId))
-    const {rawContent: nextRawContent} = removeEntityKeepText(rawContent, eqFn)
-
-    const updates = {
-      content: rawContent === nextRawContent ? undefined : JSON.stringify(nextRawContent),
-      updatedAt: now,
-      teamId,
-      integration
-    }
-
     // If there is a task with the same integration hash in the new team, then delete it first.
     // This is done so there are no duplicates and also solves the issue of the conflicting task being
     // private or archived.
-    const {deletedConflictingIntegrationTask} = await r({
-      deletedConflictingIntegrationTask:
-        task.integrationHash &&
-        r
-          .table('Task')
-          .getAll(task.integrationHash, {index: 'integrationHash'})
-          .filter({teamId})
-          .delete({returnChanges: true})('changes')(0)('old_val')
-          .default(null),
-      newTask: r.table('Task').get(taskId).update(updates),
-      taskHistory: r
-        .table('TaskHistory')
-        .between([taskId, r.minval], [taskId, r.maxval], {
-          index: 'taskIdUpdatedAt'
+    if (task.integrationHash) {
+      const deletedTask = await pg
+        .deleteFrom('Task')
+        .where('integrationHash', '=', task.integrationHash)
+        .where('teamId', '=', teamId)
+        .limit(1)
+        .returning('id')
+        .executeTakeFirst()
+      if (deletedTask) {
+        const isPrivate = task.tags.includes('private')
+        const data = {task}
+        newTeamMembers.forEach(({userId}) => {
+          if (!isPrivate || userId === task.userId) {
+            publish(SubscriptionChannel.TASK, userId, 'DeleteTaskPayload', data, subOptions)
+          }
         })
-        .orderBy({index: 'taskIdUpdatedAt'})
-        .nth(-1)
-        .default(null)
-        .do((taskHistoryRecord: RValue) => {
-          // prepopulated cards will not have a history
-          return r.branch(
-            taskHistoryRecord.ne(null),
-            r.table('TaskHistory').insert(taskHistoryRecord.merge(updates, {id: generateUID()})),
-            null
-          )
-        })
-    }).run()
-
-    if (deletedConflictingIntegrationTask) {
-      const task = deletedConflictingIntegrationTask as unknown as Task
-      const isPrivate = task.tags.includes('private')
-      const data = {task}
-      newTeamMembers.forEach(({userId}) => {
-        if (!isPrivate || userId === task.userId) {
-          publish(SubscriptionChannel.TASK, userId, 'DeleteTaskPayload', data, subOptions)
-        }
-      })
+      }
     }
-
+    await pg
+      .updateTable('Task')
+      .set({
+        teamId,
+        integration: JSON.stringify(integration)
+      })
+      .where('id', '=', taskId)
+      .executeTakeFirst()
+    dataLoader.clearAll('tasks')
     const isPrivate = tags.includes('private')
     const data = {taskId}
     const teamMembers = oldTeamMembers.concat(newTeamMembers)

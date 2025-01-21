@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react'
+import {useEffect} from 'react'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useDocumentTitle from '../hooks/useDocumentTitle'
 import useMutationProps from '../hooks/useMutationProps'
@@ -37,7 +37,9 @@ const TeamInvitationSSO = (props: Props) => {
       emitGA4SignUpEvent(ga4Args)
       AcceptTeamInvitationMutation(atmosphere, {invitationToken}, {history, onCompleted, onError})
     }
-    loginWithSAML().catch()
+    loginWithSAML().catch(() => {
+      /*ignore*/
+    })
   }, [])
   useDocumentTitle('SSO Login | Team Invitation', 'Team Invitation')
 

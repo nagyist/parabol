@@ -1,4 +1,3 @@
-import React from 'react'
 import useAtmosphere from '../hooks/useAtmosphere'
 import {MenuProps} from '../hooks/useMenu'
 import {MenuMutationProps} from '../hooks/useMutationProps'
@@ -36,9 +35,9 @@ const JiraServerConfigMenu = (props: Props) => {
     }, Duration.PORTAL_CLOSE)
   }
   return (
-    <Menu ariaLabel={'Configure your Jira Serverintegration'} {...menuProps}>
+    <Menu ariaLabel={'Configure your Jira Data Center integration'} {...menuProps}>
       <MenuItem label='Refresh token' onClick={openOAuth} />
-      <MenuItem label='Remove Jira Server' onClick={removeJiraServer} />
+      <MenuItem label='Remove Jira Data Center' onClick={removeJiraServer} />
     </Menu>
   )
 }

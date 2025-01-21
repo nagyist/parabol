@@ -1,8 +1,8 @@
 import base64url from 'base64url'
-import cheerio from 'cheerio'
+import * as cheerio from 'cheerio'
 import crypto from 'crypto'
 import ms from 'ms'
-import AtlassianManager from 'parabol-client/utils/AtlassianManager'
+import AtlassianServerManager from '../AtlassianServerManager'
 import getRedis from '../getRedis'
 
 export const NO_IMAGE_BUFFER = Buffer.from('X')
@@ -23,7 +23,7 @@ if (!serverSecret) {
 export const updateJiraImageUrls = (cloudId: string, descriptionHTML: string) => {
   const imageUrlToHash = {} as Record<string, string>
   const projectBaseUrl = `https://api.atlassian.com/ex/jira/${cloudId}`
-
+  if (!descriptionHTML) return {updatedDescription: descriptionHTML, imageUrlToHash}
   const $ = cheerio.load(descriptionHTML)
   $('body')
     .find('img')
@@ -42,7 +42,7 @@ export const updateJiraImageUrls = (cloudId: string, descriptionHTML: string) =>
 }
 
 export const downloadAndCacheImages = async (
-  manager: AtlassianManager,
+  manager: AtlassianServerManager,
   imageUrlToHash: Record<string, string>
 ) => {
   return Promise.all(
@@ -53,7 +53,7 @@ export const downloadAndCacheImages = async (
 }
 
 export const downloadAndCacheImage = async (
-  manager: AtlassianManager,
+  manager: AtlassianServerManager,
   imageUrlHash: string,
   imageUrl: string
 ) => {

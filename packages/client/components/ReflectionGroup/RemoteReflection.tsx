@@ -1,24 +1,26 @@
 import {keyframes} from '@emotion/core'
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {RefObject, useEffect, useMemo, useRef} from 'react'
+import * as React from 'react'
+import {RefObject, useEffect, useMemo, useRef} from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
 import useSpotlightResults from '~/hooks/useSpotlightResults'
+import {RemoteReflection_meeting$key} from '../../__generated__/RemoteReflection_meeting.graphql'
+import {
+  RemoteReflection_reflection$data,
+  RemoteReflection_reflection$key
+} from '../../__generated__/RemoteReflection_reflection.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
-import useEditorState from '../../hooks/useEditorState'
+import {useTipTapReflectionEditor} from '../../hooks/useTipTapReflectionEditor'
 import {Elevation} from '../../styles/elevation'
 import {BezierCurve, DragAttribute, ElementWidth, Times, ZIndex} from '../../types/constEnums'
 import {DeepNonNullable} from '../../types/generics'
+import {cn} from '../../ui/cn'
 import {VOTE} from '../../utils/constants'
 import {getMinTop} from '../../utils/retroGroup/updateClonePosition'
-import {RemoteReflection_meeting$key} from '../../__generated__/RemoteReflection_meeting.graphql'
-import {
-  RemoteReflection_reflection$key,
-  RemoteReflection_reflection$data
-} from '../../__generated__/RemoteReflection_reflection.graphql'
+import {TipTapEditor} from '../promptResponse/TipTapEditor'
 import ReflectionCardAuthor from '../ReflectionCard/ReflectionCardAuthor'
 import ReflectionCardRoot from '../ReflectionCard/ReflectionCardRoot'
-import ReflectionEditorWrapper from '../ReflectionEditorWrapper'
 import getBBox from '../RetroReflectPhase/getBBox'
 import UserDraggingHeader, {RemoteReflectionArrow} from '../UserDraggingHeader'
 
@@ -58,8 +60,8 @@ const RemoteReflectionModal = styled('div')<{
   animation: animation
     ? animation
     : isSpotlight && !isDropping
-    ? `${circleAnimation(transform)} 3s ease infinite;`
-    : undefined,
+      ? `${circleAnimation(transform)} 3s ease infinite;`
+      : undefined,
   zIndex: isInViewerSpotlightResults
     ? ZIndex.REFLECTION_IN_FLIGHT_SPOTLIGHT
     : ZIndex.REFLECTION_IN_FLIGHT
@@ -117,10 +119,10 @@ const getHeaderTransform = (ref: RefObject<HTMLDivElement>, topPadding = 18) => 
     headerTop === maxTop
       ? 'arrow_downward'
       : headerLeft === maxLeft
-      ? 'arrow_forward'
-      : headerLeft === minLeft
-      ? 'arrow_back'
-      : ('arrow_upward' as RemoteReflectionArrow)
+        ? 'arrow_forward'
+        : headerLeft === minLeft
+          ? 'arrow_back'
+          : ('arrow_upward' as RemoteReflectionArrow)
   return {
     arrow,
     headerTransform: `translate(${headerLeft}px,${headerTop}px)`
@@ -135,7 +137,7 @@ const getHeaderTransform = (ref: RefObject<HTMLDivElement>, topPadding = 18) => 
 */
 const getStyle = (
   remoteDrag: RemoteReflection_reflection$data['remoteDrag'],
-  isDropping: boolean | null,
+  isDropping: boolean | null | undefined,
   isSpotlight: boolean,
   style: React.CSSProperties
 ) => {
@@ -212,7 +214,7 @@ const RemoteReflection = (props: Props) => {
     RemoteReflection_reflection$data['remoteDrag']
   >
   const ref = useRef<HTMLDivElement>(null)
-  const [editorState] = useEditorState(content)
+  const {editor} = useTipTapReflectionEditor(content, {readOnly: true})
   const timeoutRef = useRef(0)
   const atmosphere = useAtmosphere()
   const spotlightResultGroups = useSpotlightResults(meeting)
@@ -232,8 +234,8 @@ const RemoteReflection = (props: Props) => {
       remoteDrag?.isSpotlight
         ? Times.REFLECTION_SPOTLIGHT_DRAG_STALE_TIMEOUT
         : localPhase.phaseType === VOTE
-        ? 0
-        : Times.REFLECTION_DRAG_STALE_TIMEOUT
+          ? 0
+          : Times.REFLECTION_DRAG_STALE_TIMEOUT
     )
     return () => {
       window.clearTimeout(timeoutRef.current)
@@ -251,7 +253,7 @@ const RemoteReflection = (props: Props) => {
     }
   }, [remoteDrag, meetingMembers])
 
-  if (!remoteDrag) return null
+  if (!remoteDrag || !editor) return null
   const {dragUserId, dragUserName, isSpotlight} = remoteDrag
 
   const {nextStyle, transform, minTop} = getStyle(remoteDrag, isDropping, isSpotlight, style)
@@ -269,10 +271,9 @@ const RemoteReflection = (props: Props) => {
       >
         <ReflectionCardRoot>
           {!headerTransform && <UserDraggingHeader userId={dragUserId} name={dragUserName} />}
-          <ReflectionEditorWrapper
-            editorState={editorState}
-            readOnly
-            disableAnonymity={disableAnonymity}
+          <TipTapEditor
+            className={cn('flex min-h-0 items-center px-4 leading-4')}
+            editor={editor}
           />
           {disableAnonymity && (
             <ReflectionCardAuthor>{creator?.preferredName}</ReflectionCardAuthor>

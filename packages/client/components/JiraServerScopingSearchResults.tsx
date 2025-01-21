@@ -1,16 +1,16 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
+import {useState} from 'react'
 import {PreloadedQuery, useFragment, usePaginationFragment, usePreloadedQuery} from 'react-relay'
 import useGetUsedServiceTaskIds from '~/hooks/useGetUsedServiceTaskIds'
 import MockScopingList from '~/modules/meeting/components/MockScopingList'
-import useAtmosphere from '../hooks/useAtmosphere'
-import useLoadNextOnScrollBottom from '../hooks/useLoadNextOnScrollBottom'
-import PersistJiraServerSearchQueryMutation from '../mutations/PersistJiraServerSearchQueryMutation'
 import {JiraServerScopingSearchResultsPaginationQuery} from '../__generated__/JiraServerScopingSearchResultsPaginationQuery.graphql'
 import {JiraServerScopingSearchResultsQuery} from '../__generated__/JiraServerScopingSearchResultsQuery.graphql'
 import {JiraServerScopingSearchResults_meeting$key} from '../__generated__/JiraServerScopingSearchResults_meeting.graphql'
 import {JiraServerScopingSearchResults_query$key} from '../__generated__/JiraServerScopingSearchResults_query.graphql'
+import useAtmosphere from '../hooks/useAtmosphere'
+import useLoadNextOnScrollBottom from '../hooks/useLoadNextOnScrollBottom'
+import PersistJiraServerSearchQueryMutation from '../mutations/PersistJiraServerSearchQueryMutation'
 import Ellipsis from './Ellipsis/Ellipsis'
 import IntegrationScopingNoResults from './IntegrationScopingNoResults'
 import NewIntegrationRecordButton from './NewIntegrationRecordButton'
@@ -195,7 +195,7 @@ const JiraServerScopingSearchResults = (props: Props) => {
             summary={node.summary}
             url={node.url}
             linkText={node.issueKey}
-            linkTitle={`Jira Server Issue #${node.issueKey}`}
+            linkTitle={`Jira Data Center Issue #${node.issueKey}`}
           />
         )
       })}

@@ -13,11 +13,9 @@ module.exports = {
       '@emotion/styled',
       '@mattkrick/graphql-trebuchet-client',
       '@mattkrick/sanitize-svg',
-      "@mattkrick/trebuchet-client",
+      '@mattkrick/trebuchet-client',
       '@sentry/browser',
-      'core-js',
       'debug',
-      'draft-js',
       'email-addresses',
       'emoji-mart',
       'eventemitter3',
@@ -50,8 +48,7 @@ module.exports = {
       'string-score',
       'tayden-clusterfck',
       'tlds',
-      'tslib',
-      'unicode-substring'
+      'tslib'
     ]
   },
   resolve: {

@@ -1,8 +1,8 @@
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import {TaskColumnAddTask_teams$key} from '~/__generated__/TaskColumnAddTask_teams.graphql'
 import {AreaEnum, TaskStatusEnum} from '~/__generated__/UpdateTaskMutation.graphql'
+import {TaskColumnAddTask_tasks$key} from '../../../../__generated__/TaskColumnAddTask_tasks.graphql'
 import AddTaskButton from '../../../../components/AddTaskButton/AddTaskButton'
 import useAtmosphere from '../../../../hooks/useAtmosphere'
 import CreateTaskMutation from '../../../../mutations/CreateTaskMutation'
@@ -10,7 +10,6 @@ import dndNoise from '../../../../utils/dndNoise'
 import getNextSortOrder from '../../../../utils/getNextSortOrder'
 import fromTeamMemberId from '../../../../utils/relay/fromTeamMemberId'
 import {taskStatusLabels} from '../../../../utils/taskStatus'
-import {TaskColumnAddTask_tasks$key} from '../../../../__generated__/TaskColumnAddTask_tasks.graphql'
 import TaskColumnAddTaskSelectTeam from './TaskColumnAddTaskSelectTeam'
 
 interface Props {
@@ -21,7 +20,7 @@ interface Props {
   tasks: TaskColumnAddTask_tasks$key
   myTeamMemberId?: string
   teamMemberFilterId: string
-  teams: TaskColumnAddTask_teams$key | null
+  teams: TaskColumnAddTask_teams$key | null | undefined
 }
 
 const TaskColumnAddTask = (props: Props) => {

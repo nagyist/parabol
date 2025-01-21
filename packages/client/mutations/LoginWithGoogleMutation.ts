@@ -1,8 +1,8 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {handleSuccessfulLogin} from '~/utils/handleSuccessfulLogin'
-import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {LoginWithGoogleMutation as TLoginWithGoogleMutation} from '../__generated__/LoginWithGoogleMutation.graphql'
+import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {handleAcceptTeamInvitationErrors} from './AcceptTeamInvitationMutation'
 import handleAuthenticationRedirect from './handlers/handleAuthenticationRedirect'
 
@@ -10,13 +10,13 @@ const mutation = graphql`
   mutation LoginWithGoogleMutation(
     $code: ID!
     $invitationToken: ID!
-    $segmentId: ID
+    $pseudoId: ID
     $isInvitation: Boolean!
     $params: String!
   ) {
     loginWithGoogle(
       code: $code
-      segmentId: $segmentId
+      pseudoId: $pseudoId
       invitationToken: $invitationToken
       params: $params
     ) {
@@ -48,9 +48,15 @@ const LoginWithGoogleMutation: StandardMutation<TLoginWithGoogleMutation, Histor
       handleAcceptTeamInvitationErrors(atmosphere, acceptTeamInvitation)
       if (!uiError && !errors) {
         handleSuccessfulLogin(loginWithGoogle)
-        const authToken = acceptTeamInvitation?.authToken ?? loginWithGoogle.authToken
+        const authToken = acceptTeamInvitation?.authToken || loginWithGoogle.authToken!
         atmosphere.setAuthToken(authToken)
-        handleAuthenticationRedirect(acceptTeamInvitation, {atmosphere, history})
+        const redirectPath = '/meetings'
+
+        handleAuthenticationRedirect(acceptTeamInvitation, {
+          atmosphere,
+          history,
+          redirectPath
+        })
       }
     }
   })

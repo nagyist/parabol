@@ -1,22 +1,25 @@
-import {stateToHTML} from 'draft-js-export-html'
+import {generateHTML, generateJSON, generateText, type JSONContent} from '@tiptap/core'
 import EventEmitter from 'eventemitter3'
 import {parse, stringify} from 'flatted'
 import ms from 'ms'
 import {Variables} from 'relay-runtime'
 import StrictEventEmitter from 'strict-event-emitter-types'
 import stringSimilarity from 'string-similarity'
-import {PALETTE} from '~/styles/paletteV3'
 import {ReactableEnum} from '~/__generated__/AddReactjiToReactableMutation.graphql'
 import {DragReflectionDropTargetTypeEnum} from '~/__generated__/EndDraggingReflectionMutation.graphql'
-import DiscussPhase from '../../../server/database/types/DiscussPhase'
-import DiscussStage from '../../../server/database/types/DiscussStage'
-import NewMeetingPhase from '../../../server/database/types/GenericMeetingPhase'
-import NewMeetingStage from '../../../server/database/types/GenericMeetingStage'
+import {PALETTE} from '~/styles/paletteV3'
 import GoogleAnalyzedEntity from '../../../server/database/types/GoogleAnalyzedEntity'
-import Reflection from '../../../server/database/types/Reflection'
-import ReflectionGroup from '../../../server/database/types/ReflectionGroup'
 import ReflectPhase from '../../../server/database/types/ReflectPhase'
-import ITask from '../../../server/database/types/Task'
+import {NewMeetingStage} from '../../../server/graphql/private/resolverTypes'
+import {
+  DiscussPhase,
+  DiscussStage,
+  NewMeetingPhase
+} from '../../../server/postgres/types/NewMeetingPhase'
+import {Task as ITask} from '../../../server/postgres/types/index.d'
+import {getTagsFromTipTapTask} from '../../shared/tiptap/getTagsFromTipTapTask'
+import {serverTipTapExtensions} from '../../shared/tiptap/serverTipTapExtensions'
+import {splitTipTapContent} from '../../shared/tiptap/splitTipTapContent'
 import {
   ExternalLinks,
   MeetingSettingsThreshold,
@@ -25,17 +28,13 @@ import {
 } from '../../types/constEnums'
 import {DISCUSS, GROUP, REFLECT, VOTE} from '../../utils/constants'
 import dndNoise from '../../utils/dndNoise'
-import extractTextFromDraftString from '../../utils/draftjs/extractTextFromDraftString'
-import getTagsFromEntityMap from '../../utils/draftjs/getTagsFromEntityMap'
-import makeEmptyStr from '../../utils/draftjs/makeEmptyStr'
-import splitDraftContent from '../../utils/draftjs/splitDraftContent'
 import findStageById from '../../utils/meetings/findStageById'
 import sleep from '../../utils/sleep'
 import getGroupSmartTitle from '../../utils/smartGroup/getGroupSmartTitle'
 import startStage_ from '../../utils/startStage_'
 import unlockAllStagesForPhase from '../../utils/unlockAllStagesForPhase'
 import unlockNextStages from '../../utils/unlockNextStages'
-import normalizeRawDraftJS from '../../validation/normalizeRawDraftJS'
+import LocalAtmosphere from './LocalAtmosphere'
 import entityLookup from './entityLookup'
 import getDemoEntities from './getDemoEntities'
 import handleCompletedDemoStage from './handleCompletedDemoStage'
@@ -43,15 +42,14 @@ import initBotScript from './initBotScript'
 import initDB, {
   DemoComment,
   DemoDiscussion,
-  demoTeamId,
   DemoThreadableEdge,
-  demoViewerId,
   JiraProjectKeyLookup,
-  RetroDemoDB
+  RetroDemoDB,
+  demoTeamId,
+  demoViewerId
 } from './initDB'
-import LocalAtmosphere from './LocalAtmosphere'
 
-export type DemoReflection = Omit<Reflection, 'reactjis' | 'createdAt' | 'updatedAt'> & {
+export type DemoReflection = {
   __typename: string
   createdAt: string | Date
   dragContext: any
@@ -67,10 +65,26 @@ export type DemoReflection = Omit<Reflection, 'reactjis' | 'createdAt' | 'update
   reflectionId: string
   retroReflectionGroup: DemoReflectionGroup
   updatedAt: string | Date
+  content: string
+  plaintextContent: string
+  isActive: boolean
+  reflectionGroupId: string
+  id: string
+  sortOrder: number
+  promptId: string
 }
 
-export type DemoReflectionGroup = Omit<ReflectionGroup, 'team' | 'createdAt' | 'updatedAt'> & {
+export type DemoReflectionGroup = {
   __typename: string
+  id: string
+  isActive: boolean
+  meetingId: string
+  promptId: string
+  sortOrder: number
+  smartTitle: string | null
+  summary: string | null
+  title: string | null
+  discussionPromptQuestion: string | null
   commentors: any
   createdAt: string | Date
   meeting: any
@@ -86,11 +100,7 @@ export type DemoReflectionGroup = Omit<ReflectionGroup, 'team' | 'createdAt' | '
   voterIds: string[]
 }
 
-export type IDiscussPhase = Omit<DiscussPhase, 'readyToAdvance' | 'endAt' | 'startAt'> & {
-  readyToAdvance: any
-  startAt: string | Date
-  endAt: string | Date
-}
+export type IDiscussPhase = DiscussPhase
 
 export type IReflectPhase = Omit<ReflectPhase, 'endAt' | 'startAt'> & {
   startAt: string | Date
@@ -251,7 +261,7 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       return {
         viewer: {
           ...this.db.users[0],
-          newMeeting: {
+          meeting: {
             ...this.db.newMeeting,
             reflectionGroups: (
               this.db.newMeeting as {reflectionGroups: any[]}
@@ -283,11 +293,22 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
         }
       }
     },
+    tiptapMentionConfigQuery: () => {
+      return {
+        viewer: {
+          ...this.db.users[0],
+          team: {
+            ...this.db.team,
+            teamMembers: this.db.teamMembers
+          }
+        }
+      }
+    },
     NewMeetingSummaryQuery: () => {
       return {
         viewer: {
           ...this.db.users[0],
-          newMeeting: {
+          meeting: {
             ...this.db.newMeeting,
             reflectionGroups: (
               this.db.newMeeting as {reflectionGroups: any[]}
@@ -452,8 +473,9 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       // if the human deleted the task, exit fast
       if (!task) return null
       const {content} = task
-      const {title, contentState} = splitDraftContent(content)
-      const bodyHTML = stateToHTML(contentState)
+      const doc = JSON.parse(content)
+      const {title, bodyContent} = splitTipTapContent(doc)
+      const bodyHTML = generateHTML(bodyContent, serverTipTapExtensions)
 
       if (integrationProviderService === 'github') {
         Object.assign(task, {
@@ -527,8 +549,8 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       const prompt = reflectPhase.reflectPrompts.find((prompt) => prompt.id === promptId)
       const reflectionGroupId = groupId || this.getTempId('refGroup')
       const reflectionId = id || this.getTempId('ref')
-      const normalizedContent = normalizeRawDraftJS(content)
-      const plaintextContent = extractTextFromDraftString(normalizedContent)
+      const normalizedContent = JSON.parse(content) as JSONContent
+      const plaintextContent = generateText(normalizedContent, serverTipTapExtensions)
       let entities = [] as GoogleAnalyzedEntity[]
       if (userId !== demoViewerId) {
         entities = entityLookup[reflectionId as keyof typeof entityLookup].entities
@@ -543,7 +565,8 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
         reflectionId,
         createdAt: now,
         creatorId: userId,
-        content: normalizedContent,
+        creator: this.db.users.find((user) => user.id === userId),
+        content: JSON.stringify(normalizedContent),
         groupColor: PALETTE.JADE_400,
         plaintextContent,
         dragContext: null,
@@ -718,7 +741,7 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       const reflection = this.db.reflections.find((reflection) => reflection.id === reflectionId)!
       reflection.content = content
       reflection.updatedAt = new Date().toJSON()
-      const plaintextContent = extractTextFromDraftString(content)
+      const plaintextContent = generateText(JSON.parse(content), serverTipTapExtensions)
       const isVeryDifferent =
         stringSimilarity.compareTwoStrings(plaintextContent, reflection.plaintextContent) < 0.9
       const entities = isVeryDifferent
@@ -1034,7 +1057,6 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
           reflectionGroupId: newReflectionGroupId,
           updatedAt: now
         })
-        this.db.newMeeting.nextAutoGroupThreshold = null
         const nextTitle = getGroupSmartTitle([reflection as DemoReflection])
         newReflectionGroup.smartTitle = nextTitle
         newReflectionGroup.title = nextTitle
@@ -1071,7 +1093,7 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
             retroReflectionGroup: reflectionGroup as any,
             updatedAt: now
           })
-          reflectionGroup.reflections!.push(reflection as any)
+          reflectionGroup.reflections.push(reflection as any)
           reflectionGroup.reflections.sort((a, b) => (a.sortOrder < b.sortOrder ? 1 : -1))
           oldReflections.splice(
             oldReflections.findIndex((reflection) => reflection === reflection),
@@ -1219,7 +1241,7 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       reflectionGroup.voteCount = voterIds.length
       reflectionGroup.viewerVoteCount = voterIds.filter((id) => id === demoViewerId).length
       const voteCount = this.db.reflectionGroups.reduce(
-        (sum, group) => sum + group.voterIds!.length,
+        (sum, group) => sum + group.voterIds.length,
         0
       )
 
@@ -1258,11 +1280,13 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       const now = new Date().toJSON()
       const taskId = newTask.id || this.getTempId('task')
       const {discussionId, threadParentId, threadSortOrder, sortOrder, status} = newTask
-      const content = newTask.content || makeEmptyStr()
-      const {entityMap} = JSON.parse(content)
-      const tags = getTagsFromEntityMap(entityMap)
+      const content =
+        (newTask.content as string) ||
+        JSON.stringify(generateJSON('<p></p>', serverTipTapExtensions))
+      const doc = JSON.parse(content)
+      const tags = getTagsFromTipTapTask(doc)
       const user = this.db.users.find((user) => user.id === userId)
-      const plaintextContent = extractTextFromDraftString(content)
+      const plaintextContent = generateText(doc, serverTipTapExtensions)
       const task = {
         __typename: 'Task',
         __isThreadable: 'Task',
@@ -1409,7 +1433,7 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
       const taskUpdates = {
         content,
         status,
-        tags: content ? getTagsFromEntityMap(JSON.parse(content).entityMap) : undefined,
+        tags: content ? getTagsFromTipTapTask(JSON.parse(content)) : undefined,
         teamId: demoTeamId,
         sortOrder,
         userId: updatedTask.userId || task.userId
@@ -1509,7 +1533,7 @@ class ClientGraphQLServer extends (EventEmitter as GQLDemoEmitter) {
     },
     EndRetrospectiveMutation: ({meetingId}: {meetingId: string}, userId: string) => {
       const phases = this.db.newMeeting.phases as INewMeetingPhase[]
-      const lastPhase = phases[phases.length - 1] as IDiscussPhase
+      const lastPhase = phases[phases.length - 1]!
       const currentStage = lastPhase.stages.find(
         (stage) => stage.startAt && !stage.endAt
       ) as IDiscussStage

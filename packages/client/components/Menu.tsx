@@ -1,5 +1,6 @@
 import styled from '@emotion/styled'
-import React, {
+
+import {
   Children,
   cloneElement,
   forwardRef,
@@ -11,6 +12,8 @@ import React, {
   useRef,
   useState
 } from 'react'
+
+import * as React from 'react'
 import {PortalStatus} from '../hooks/usePortal'
 import MenuItemAnimation from './MenuItemAnimation'
 
@@ -22,7 +25,6 @@ const MenuStyles = styled('div')({
   maxHeight: 224,
   maxWidth: 400,
   outline: 0,
-  // VERY important! If not present, draft-js gets confused & thinks the menu is the selection rectangle
   userSelect: 'none'
 })
 
@@ -66,15 +68,9 @@ const Menu = forwardRef((props: Props, ref: any) => {
     handleKeyDown
   }))
 
-  useEffect(
-    () => {
-      if (!keepParentFocus) menuRef.current && menuRef.current.focus()
-    },
-    resetActiveOnChanges ||
-      [
-        /* eslint-disable-line react-hooks/exhaustive-deps*/
-      ]
-  )
+  useEffect(() => {
+    if (!keepParentFocus) menuRef.current && menuRef.current.focus()
+  }, resetActiveOnChanges || [])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {

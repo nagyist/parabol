@@ -3,14 +3,10 @@ import nullIfEmpty from 'parabol-client/utils/nullIfEmpty'
 import toTeamMemberId from 'parabol-client/utils/relay/toTeamMemberId'
 import {NewMeetingPhaseTypeEnum} from '../database/types/GenericMeetingPhase'
 import GenericMeetingStage from '../database/types/GenericMeetingStage'
-import Meeting from '../database/types/Meeting'
 import Organization from '../database/types/Organization'
-import Task from '../database/types/Task'
-import TeamMember from '../database/types/TeamMember'
 import User from '../database/types/User'
 import {Loaders} from '../dataloader/RootDataLoader'
-import {IGetTeamsByIdsQueryResult} from '../postgres/queries/generated/getTeamsByIdsQuery'
-import {Team} from '../postgres/queries/getTeamsByIds'
+import {Task, Team, TeamMember} from '../postgres/types'
 import {AnyMeeting} from '../postgres/types/Meeting'
 import {getUserId, isSuperUser, isUserBillingLeader} from '../utils/authorization'
 import {GQLContext} from './graphql'
@@ -77,7 +73,7 @@ export const resolveTasks = async (
 }
 
 export const resolveTeam = (
-  {team, teamId}: {teamId?: string; team?: IGetTeamsByIdsQueryResult},
+  {team, teamId}: {teamId?: string; team?: Team},
   _args: unknown,
   {dataLoader}: GQLContext
 ) => {
@@ -118,7 +114,7 @@ export const resolveTeamMembers = (
     : teamMembers
 }
 
-export const resolveGQLStageFromId = (stageId: string | undefined, meeting: Meeting) => {
+export const resolveGQLStageFromId = (stageId: string | undefined, meeting: AnyMeeting) => {
   const {id: meetingId, phases} = meeting
   const stageRes = findStageById(phases, stageId)
   if (!stageRes) return undefined
@@ -161,7 +157,7 @@ export const resolveUnlockedStages = async (
   {dataLoader}: GQLContext
 ) => {
   if (!unlockedStageIds || unlockedStageIds.length === 0 || !meetingId) return undefined
-  const meeting = await dataLoader.get('newMeetings').load(meetingId)
+  const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
   return unlockedStageIds.map((stageId) => resolveGQLStageFromId(stageId, meeting))
 }
 
@@ -186,7 +182,7 @@ export const makeResolve =
   (source: any, _args: any, {dataLoader}: GQLContext) => {
     const idValue = source[idName]
     const method = isMany ? 'loadMany' : 'load'
-    return idValue ? (dataLoader.get(dataLoaderName)[method] as any)(idValue) : source[docName]
+    return idValue ? (dataLoader as any).get(dataLoaderName)[method](idValue) : source[docName]
   }
 
 export const resolveFilterByTeam =

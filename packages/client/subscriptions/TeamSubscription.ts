@@ -17,15 +17,18 @@ import {
   acceptTeamInvitationTeamUpdater
 } from '../mutations/AcceptTeamInvitationMutation'
 import {addAgendaItemUpdater} from '../mutations/AddAgendaItemMutation'
+import {addPokerTemplateTeamUpdater} from '../mutations/AddPokerTemplateMutation'
 import {addReflectTemplateTeamUpdater} from '../mutations/AddReflectTemplateMutation'
 import {addReflectTemplatePromptTeamUpdater} from '../mutations/AddReflectTemplatePromptMutation'
 import {addTeamTeamUpdater} from '../mutations/AddTeamMutation'
 import {archiveTeamTeamOnNext, archiveTeamTeamUpdater} from '../mutations/ArchiveTeamMutation'
+import {batchArchiveTasksTaskUpdater} from '../mutations/BatchArchiveTasksMutation'
 import {denyPushInvitationTeamOnNext} from '../mutations/DenyPushInvitationMutation'
 import {
   endSprintPokerTeamOnNext,
   endSprintPokerTeamUpdater
 } from '../mutations/EndSprintPokerMutation'
+import {endTeamPromptTeamUpdater} from '../mutations/EndTeamPromptMutation'
 import {moveReflectTemplatePromptTeamUpdater} from '../mutations/MoveReflectTemplatePromptMutation'
 import {pushInvitationTeamOnNext} from '../mutations/PushInvitationMutation'
 import {removeAgendaItemUpdater} from '../mutations/RemoveAgendaItemMutation'
@@ -44,6 +47,9 @@ const subscription = graphql`
   subscription TeamSubscription {
     teamSubscription {
       fieldName
+      GenerateInsightSuccess {
+        ...GenerateInsightMutation_team @relay(mask: false)
+      }
       UpdateRecurrenceSettingsSuccess {
         ...UpdateRecurrenceSettingsMutation_team @relay(mask: false)
       }
@@ -65,14 +71,20 @@ const subscription = graphql`
       AddAtlassianAuthPayload {
         ...AddAtlassianAuthMutation_team @relay(mask: false)
       }
-      AddReflectTemplatePayload {
+      AddReflectTemplateSuccess {
         ...AddReflectTemplateMutation_team @relay(mask: false)
+      }
+      AddPokerTemplateSuccess {
+        ...AddPokerTemplateMutation_team @relay(mask: false)
       }
       AddReflectTemplatePromptPayload {
         ...AddReflectTemplatePromptMutation_team @relay(mask: false)
       }
       AddTeamPayload {
         ...AddTeamMutation_team @relay(mask: false)
+      }
+      BatchArchiveTasksSuccess {
+        ...BatchArchiveTasksMutation_tasks @relay(mask: false)
       }
       ArchiveTeamPayload {
         ...ArchiveTeamMutation_team @relay(mask: false)
@@ -173,15 +185,6 @@ const subscription = graphql`
       OldUpgradeToTeamTierPayload {
         ...OldUpgradeToTeamTierMutation_team @relay(mask: false)
       }
-      UpgradeToTeamTierSuccess {
-        ...UpgradeToTeamTierFrag_team @relay(mask: false)
-      }
-      UpdateIntegrationProviderSuccess {
-        ...UpdateIntegrationProviderMutation_team @relay(mask: false)
-      }
-      AddIntegrationProviderSuccess {
-        ...AddIntegrationProviderMutation_team @relay(mask: false)
-      }
     }
   }
 `
@@ -203,13 +206,16 @@ const updateHandlers = {
   RemoveAgendaItemPayload: removeAgendaItemUpdater,
   UpdateAgendaItemPayload: updateAgendaItemUpdater,
   AcceptTeamInvitationPayload: acceptTeamInvitationTeamUpdater,
-  AddReflectTemplatePayload: addReflectTemplateTeamUpdater,
+  AddReflectTemplateSuccess: addReflectTemplateTeamUpdater,
+  AddPokerTemplateSuccess: addPokerTemplateTeamUpdater,
   AddReflectTemplatePromptPayload: addReflectTemplatePromptTeamUpdater,
   AddTeamMutationPayload: addTeamTeamUpdater,
   ArchiveTeamPayload: archiveTeamTeamUpdater,
+  BatchArchiveTasksSuccess: batchArchiveTasksTaskUpdater,
   EndCheckInSuccess: endCheckInTeamUpdater,
   EndRetrospectiveSuccess: endRetrospectiveTeamUpdater,
   EndSprintPokerSuccess: endSprintPokerTeamUpdater,
+  EndTeamPromptSuccess: endTeamPromptTeamUpdater,
   MoveReflectTemplatePromptPayload: moveReflectTemplatePromptTeamUpdater,
   NavigateMeetingPayload: navigateMeetingTeamUpdater,
   RemoveOrgUserPayload: removeOrgUserTeamUpdater,

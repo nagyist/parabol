@@ -10,7 +10,6 @@ import {
   Timeline
 } from '@mui/icons-material'
 import {PALETTE} from '../styles/paletteV3'
-import React from 'react'
 
 interface Props {
   iconName?: string

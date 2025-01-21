@@ -42,9 +42,12 @@ extend type RetrospectiveMeeting {
 }
 
 extend type TeamPromptMeeting {
+  localPhase: NewMeetingPhase!
+  localStage: NewMeetingStage!
   localStageId: String
   isRightDrawerOpen: Boolean!
   showWorkSidebar: Boolean!
+  showSidebar: Boolean!
 }
 
 extend type Team {
@@ -69,6 +72,7 @@ extend type User {
   # If positive, client clock is ahead of server clock by this many ms
   clientClockOffset: Int
   dashSearch: String
+  activityLibrarySearch: String
   pageName: String
   # The team we should default to in team pickers, etc.
   preferredTeamId: ID
@@ -119,9 +123,23 @@ extend type AgendaItemsStage {
   localScheduledEndTime: String
 }
 
+extend type EstimateStage {
+  localScheduledEndTime: String
+}
+
+extend type TeamHealthStage {
+  localScheduledEndTime: String
+}
+
+extend type TeamPromptResponseStage {
+  localScheduledEndTime: String
+}
+
 extend type Discussion {
   isAnonymousComment: Boolean!
-  replyingToCommentId: String!
+  replyingTo: Threadable
+  # the taskId if the Viewer is ecurrently editing one in the context of a discussion
+  editingTaskId: ID
 }
 
 extend type Organization {

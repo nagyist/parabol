@@ -1,8 +1,5 @@
-import GenericMeetingPhase from './GenericMeetingPhase'
+import {TeamPromptPhase} from '../../postgres/types/NewMeetingPhase'
 import Meeting from './Meeting'
-import TeamPromptResponsesPhase from './TeamPromptResponsesPhase'
-
-type TeamPromptPhase = TeamPromptResponsesPhase | GenericMeetingPhase
 
 interface Input {
   id?: string
@@ -14,24 +11,6 @@ interface Input {
   facilitatorUserId: string
   meetingSeriesId?: number
   scheduledEndTime?: Date
-}
-
-export function isMeetingTeamPrompt(meeting: Meeting): meeting is MeetingTeamPrompt {
-  return meeting.meetingType === 'teamPrompt'
-}
-
-export function createTeamPromptTitle(
-  meetingSeriesName: string,
-  startTime: Date,
-  timeZone: string
-) {
-  const formattedDate = startTime.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone
-  })
-
-  return `${meetingSeriesName} - ${formattedDate}`
 }
 
 export default class MeetingTeamPrompt extends Meeting {

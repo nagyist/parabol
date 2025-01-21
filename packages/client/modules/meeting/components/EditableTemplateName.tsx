@@ -1,6 +1,5 @@
 import styled from '@emotion/styled'
 import clsx from 'clsx'
-import React from 'react'
 import EditableText from '../../../components/EditableText'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import useMutationProps from '../../../hooks/useMutationProps'
@@ -25,7 +24,7 @@ const EditableTemplateName = (props: Props) => {
   const {name, templateId, isOwner, className} = props
   const atmosphere = useAtmosphere()
   const {onError, error, onCompleted, submitMutation, submitting} = useMutationProps()
-  const autoFocus = name === '*New Template' || name.endsWith(' Copy')
+  const autoFocus = name.startsWith('*New Template') || name.endsWith(' Copy')
 
   const handleSubmit = (rawName: string) => {
     if (submitting) return

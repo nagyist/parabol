@@ -1,12 +1,13 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
-import {StandardMutation} from '../types/relayMutations'
 import {CreateMassInvitationMutation as TCreateMassInvitationMutation} from '../__generated__/CreateMassInvitationMutation.graphql'
+import {StandardMutation} from '../types/relayMutations'
 
 graphql`
-  fragment CreateMassInvitationMutation_team on CreateMassInvitationSuccess {
+  fragment CreateMassInvitationMutation_team on CreateMassInvitationSuccess
+  @argumentDefinitions(meetingId: {type: "ID", defaultValue: null}) {
     team {
-      massInvitation {
+      massInvitation(meetingId: $meetingId) {
         id
         expiration
         meetingId
@@ -23,7 +24,7 @@ const mutation = graphql`
           message
         }
       }
-      ...CreateMassInvitationMutation_team @relay(mask: false)
+      ...CreateMassInvitationMutation_team @arguments(meetingId: $meetingId)
     }
   }
 `
@@ -35,16 +36,6 @@ const CreateMassInvitationMutation: StandardMutation<TCreateMassInvitationMutati
 ) => {
   return commitMutation<TCreateMassInvitationMutation>(atmosphere, {
     mutation,
-    updater: (store) => {
-      const payload = store.getRootField('createMassInvitation')
-      if (!payload) return
-      const team = payload.getLinkedRecord('team')
-      const massInvitation = team.getLinkedRecord('massInvitation')
-      const meetingId = massInvitation.getValue('meetingId')
-      if (!meetingId) return
-      // satisfy the need of the query
-      team.setLinkedRecord(massInvitation, 'massInvitation', {meetingId})
-    },
     variables,
     onCompleted,
     onError

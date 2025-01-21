@@ -1,9 +1,8 @@
 import {GraphQLBoolean, GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import toTeamMemberId from '../../../client/utils/relay/toTeamMemberId'
-import getRethink from '../../database/rethinkDriver'
 import EstimateStage from '../../database/types/EstimateStage'
-import PokerMeetingMember from '../../database/types/PokerMeetingMember'
+import getKysely from '../../postgres/getKysely'
 import {getUserId} from '../../utils/authorization'
 import getPhase from '../../utils/getPhase'
 import publish from '../../utils/publish'
@@ -28,16 +27,15 @@ const setPokerSpectate = {
     {meetingId, isSpectating}: {meetingId: string; isSpectating: boolean},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) => {
-    const r = await getRethink()
+    const pg = getKysely()
     const viewerId = getUserId(authToken)
-    const now = new Date()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
     //AUTH
     const meetingMemberId = toTeamMemberId(meetingId, viewerId)
     const [meetingMember, meeting] = await Promise.all([
-      dataLoader.get('meetingMembers').load(meetingMemberId) as Promise<PokerMeetingMember>,
+      dataLoader.get('meetingMembers').loadNonNull(meetingMemberId),
       dataLoader.get('newMeetings').load(meetingId)
     ])
     if (!meeting) {
@@ -50,6 +48,9 @@ const setPokerSpectate = {
     if (meetingType !== 'poker') {
       return {error: {message: 'Not a poker meeting'}}
     }
+    if (meetingMember.meetingType !== 'poker') {
+      return {error: {message: 'Not a poker meeting'}}
+    }
     if (!meetingMember) {
       return {error: {message: 'Not in meeting'}}
     }
@@ -60,14 +61,15 @@ const setPokerSpectate = {
 
     // RESOLUTION
     const teamMemberId = toTeamMemberId(teamId, viewerId)
-    await r({
-      meetingMember: r.table('MeetingMember').get(meetingMemberId).update({isSpectating}),
-      teamMember: r
-        .table('TeamMember')
-        .get(teamMemberId)
-        .update({isSpectatingPoker: isSpectating, updatedAt: now})
-    }).run()
-
+    await pg
+      .with('MeetingMemberUpdate', (qb) =>
+        qb.updateTable('MeetingMember').set({isSpectating}).where('id', '=', meetingMemberId)
+      )
+      .updateTable('TeamMember')
+      .set({isSpectatingPoker: isSpectating})
+      .where('id', '=', teamMemberId)
+      .execute()
+    dataLoader.clearAll('teamMembers')
     // mutate the dataLoader cache
     meetingMember.isSpectating = isSpectating
     const dirtyStages: EstimateStage[] = []

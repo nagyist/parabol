@@ -1,7 +1,6 @@
 import graphql from 'babel-plugin-relay/macro'
-import {ASSIGNEE, MENTIONEE} from 'parabol-client/utils/constants'
 import {EmailTaskInvolves_notification$key} from 'parabol-client/__generated__/EmailTaskInvolves_notification.graphql'
-import React from 'react'
+import {ASSIGNEE, MENTIONEE} from 'parabol-client/utils/constants'
 import {useFragment} from 'react-relay'
 import makeAppURL from '../../../../utils/makeAppURL'
 import {notificationSummaryUrlParams} from '../NotificationSummaryEmail'
@@ -71,7 +70,7 @@ const EmailTaskInvolves = (props: Props) => {
       linkUrl={linkUrl}
     >
       <table style={{marginTop: '12px'}}>
-        <EmailTaskCard task={task} maxWidth={330} />
+        <EmailTaskCard task={task || null} maxWidth={330} />
       </table>
     </EmailNotificationTemplate>
   )

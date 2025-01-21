@@ -13,20 +13,19 @@ declare module '*.graphql' {
   export = value
 }
 
-declare module 'draft-js-utils'
-declare module 'draft-js-export-markdown'
 declare module 'babel-plugin-relay/macro'
 declare module '@authenio/samlify-node-xmllint'
 declare module 'node-env-flag'
 declare module '*getProjectRoot'
 declare module 'tayden-clusterfck'
-declare module 'unicode-substring'
+declare module 'jest-extended'
 declare module 'json2csv/lib/JSON2CSVParser'
 declare module 'object-hash'
 declare module 'string-score'
+declare module 'md-to-adf'
 
 declare const __APP_VERSION__: string
-declare const __PRODUCTION__: string
+declare const __PRODUCTION__: boolean
 declare const __SOCKET_PORT__: string
 declare const __webpack_public_path__: string
 
@@ -35,7 +34,6 @@ interface Window {
     atlassian: string
     github: string
     google: string
-    segment: string
     sentry: string
     slack: string
     oauth2Redirect: string

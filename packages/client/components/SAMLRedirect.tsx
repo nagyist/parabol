@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react'
+import {useEffect, useState} from 'react'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useRouter from '../hooks/useRouter'
 import DialogContent from './DialogContent'
@@ -21,7 +21,9 @@ const SAMLRedirect = () => {
         // cross-domain attempts to access opener.location.origin will throw
         // this makes sure that Parabol opened the popup
         isSameOriginPopup = !!window.opener.location.origin
-      } catch {}
+      } catch {
+        /* noop */
+      }
     }
     if (isSameOriginPopup) {
       // SP-initiated

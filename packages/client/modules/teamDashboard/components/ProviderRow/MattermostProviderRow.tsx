@@ -1,6 +1,6 @@
 import {Add as AddIcon, Close as CloseIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
+import {useState} from 'react'
 import {useFragment} from 'react-relay'
 import {MattermostProviderRow_viewer$key} from '~/__generated__/MattermostProviderRow_viewer.graphql'
 import MattermostProviderLogo from '../../../../components/MattermostProviderLogo'
@@ -18,13 +18,11 @@ interface Props {
 }
 
 graphql`
-  fragment MattermostProviderRowTeamMember on TeamMember {
-    integrations {
-      mattermost {
-        auth {
-          provider {
-            id
-          }
+  fragment MattermostProviderRowTeamMemberIntegrations on TeamMemberIntegrations {
+    mattermost {
+      auth {
+        provider {
+          id
         }
       }
     }
@@ -37,7 +35,9 @@ const MattermostProviderRow = (props: Props) => {
       fragment MattermostProviderRow_viewer on User {
         ...MattermostPanel_viewer
         teamMember(teamId: $teamId) {
-          ...MattermostProviderRowTeamMember @relay(mask: false)
+          integrations {
+            ...MattermostProviderRowTeamMemberIntegrations @relay(mask: false)
+          }
         }
       }
     `,
@@ -51,6 +51,8 @@ const MattermostProviderRow = (props: Props) => {
   const {integrations} = teamMember!
   const {mattermost} = integrations
   const {auth} = mattermost
+
+  if (window.__ACTION__.mattermostDisabled) return null
 
   return (
     <>

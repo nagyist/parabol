@@ -1,16 +1,15 @@
+interface Node {
+  id: ID!
+}
+
 """
 A team
 """
-type Team {
+type Team implements Node {
   """
   A shortid for the team
   """
   id: ID!
-
-  """
-  Whether or not new users with the same domain and a verified email should auto-join the team
-  """
-  autoJoin: Boolean!
 
   """
   The datetime the team was created
@@ -71,7 +70,6 @@ type Team {
   The datetime the team was last updated
   """
   updatedAt: DateTime
-  customPhaseItems: [ReflectPrompt] @deprecated(reason: "Field no longer needs to exist for now")
 
   """
   The outstanding invitations to join the team
@@ -81,7 +79,7 @@ type Team {
   """
   true if the viewer is the team lead, else false
   """
-  isLead: Boolean!
+  isViewerLead: Boolean!
 
   """
   The team-specific settings for running all available types of meetings
@@ -114,6 +112,16 @@ type Team {
   activeMeetings: [NewMeeting!]!
 
   """
+  Whether the team has a feature flag enabled or not
+  """
+  featureFlag(featureName: String!): Boolean!
+
+  """
+  The number of qualifying meetings that have an AI generated summary. Qualifying meetings are meetings with three or more meeting members and five or more reflections
+  """
+  qualAIMeetingsCount: Int!
+
+  """
   The new meeting in progress, if any
   """
   meeting(
@@ -122,12 +130,12 @@ type Team {
     """
     meetingId: ID!
   ): NewMeeting
+  organization: Organization!
 
   """
-  The level of access to features on the parabol site
+  The AI insight for the team. Null if not enough data or feature flag isn't set
   """
-  tier: TierEnum!
-  organization: Organization!
+  insight: Insight
 
   """
   The agenda items for the upcoming or current meeting
@@ -162,11 +170,34 @@ type Team {
   isArchived: Boolean
 
   """
-  Insights for the team, null if not enough data or feature flag isn't set
+  Whether or not new users with the same domain and a verified email should auto-join the team
   """
-  insights: TeamInsights
+  autoJoin: Boolean!
+
+  """
+  Whether the viewer belongs to the team
+  """
+  isViewerOnTeam: Boolean!
+
+  """
+  true if the viewer is an admin for the team's org, else false
+  """
+  isOrgAdmin: Boolean!
+  tier: TierEnum!
+  billingTier: TierEnum!
+
   """
   The team member that is the viewer
   """
   viewerTeamMember: TeamMember
+
+  """
+  The team member that is the team lead
+  """
+  teamLead: TeamMember!
+
+  """
+  The number of retro meetings the team has had
+  """
+  retroMeetingsCount: Int!
 }

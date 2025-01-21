@@ -1,12 +1,11 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
+import {ScopePhaseAreaAddJiraServer_meeting$key} from '../__generated__/ScopePhaseAreaAddJiraServer_meeting.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useMutationProps from '../hooks/useMutationProps'
 import {PALETTE} from '../styles/paletteV3'
 import JiraServerClientManager from '../utils/JiraServerClientManager'
-import {ScopePhaseAreaAddJiraServer_meeting$key} from '../__generated__/ScopePhaseAreaAddJiraServer_meeting.graphql'
 import JiraServerSVG from './JiraServerSVG'
 import RaisedButton from './RaisedButton'
 
@@ -78,7 +77,7 @@ const ScopePhaseAreaAddJiraServer = (props: Props) => {
     <AddJiraServerArea>
       <AddJiraServerButton onClick={openOAuth} size={'medium'}>
         <JiraServerSVG />
-        Import issues from Jira Server
+        Import issues from Jira Data Center
       </AddJiraServerButton>
       <StyledLink onClick={gotoParabol}>Or add new tasks in Parabol</StyledLink>
     </AddJiraServerArea>

@@ -1,8 +1,8 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import useUnusedRecords from '~/hooks/useUnusedRecords'
+import {GitHubScopingSelectAllIssues_issues$key} from '../__generated__/GitHubScopingSelectAllIssues_issues.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useMutationProps from '../hooks/useMutationProps'
 import UpdatePokerScopeMutation from '../mutations/UpdatePokerScopeMutation'
@@ -10,7 +10,6 @@ import GitHubIssueId from '../shared/gqlIds/GitHubIssueId'
 import {PALETTE} from '../styles/paletteV3'
 import {Threshold} from '../types/constEnums'
 import getSelectAllTitle from '../utils/getSelectAllTitle'
-import {GitHubScopingSelectAllIssues_issues$key} from '../__generated__/GitHubScopingSelectAllIssues_issues.graphql'
 import Checkbox from './Checkbox'
 const Item = styled('div')({
   display: 'flex',
@@ -72,7 +71,7 @@ const GitHubScopingSelectAllIssues = (props: Props) => {
           service: 'github',
           serviceTaskId,
           action
-        } as const)
+        }) as const
     )
 
     const variables = {

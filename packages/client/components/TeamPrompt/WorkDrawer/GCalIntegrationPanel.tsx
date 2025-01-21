@@ -1,13 +1,14 @@
-import React, {useState} from 'react'
 import graphql from 'babel-plugin-relay/macro'
+import clsx from 'clsx'
+import {useState} from 'react'
 import {useFragment} from 'react-relay'
 import {GCalIntegrationPanel_meeting$key} from '../../../__generated__/GCalIntegrationPanel_meeting.graphql'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import useMutationProps from '../../../hooks/useMutationProps'
-import GCalIntegrationResultsRoot from './GCalIntegrationResultsRoot'
-import GcalClientManager from '../../../utils/GcalClientManager'
 import gcalSVG from '../../../styles/theme/images/graphics/google-calendar.svg'
-import clsx from 'clsx'
+import GcalClientManager from '../../../utils/GcalClientManager'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
+import GCalIntegrationResultsRoot from './GCalIntegrationResultsRoot'
 
 const GCAL_QUERY_TABS = [
   {
@@ -33,6 +34,8 @@ const GCalPanel = (props: Props) => {
   const meeting = useFragment(
     graphql`
       fragment GCalIntegrationPanel_meeting on TeamPromptMeeting {
+        id
+        teamId
         viewerMeetingMember {
           teamMember {
             teamId
@@ -73,6 +76,19 @@ const GCalPanel = (props: Props) => {
     }
     const {clientId, id: providerId} = gcal.cloudProvider
     GcalClientManager.openOAuth(atmosphere, providerId, clientId, teamMember.teamId, mutationProps)
+
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Integration Connected', {
+      teamId: meeting.teamId,
+      meetingId: meeting.id,
+      service: 'gcal'
+    })
+  }
+
+  const trackTabNavigated = (label: string) => {
+    SendClientSideEvent(atmosphere, 'Your Work Drawer Tag Navigated', {
+      service: 'gcal',
+      buttonLabel: label
+    })
   }
 
   return (
@@ -84,12 +100,15 @@ const GCalPanel = (props: Props) => {
               <div
                 key={tab.key}
                 className={clsx(
-                  'w-1/2 cursor-pointer rounded-full py-3 px-3 text-center text-sm leading-3 text-slate-800',
+                  'w-1/2 cursor-pointer rounded-full px-3 py-3 text-center text-sm leading-3 text-slate-800',
                   tab.key === eventRangeKey
                     ? 'bg-grape-700 font-semibold text-white focus:text-white'
                     : 'border border-slate-300 bg-white'
                 )}
-                onClick={() => setEventRangeKey(tab.key)}
+                onClick={() => {
+                  trackTabNavigated(tab.label)
+                  setEventRangeKey(tab.key)
+                }}
               >
                 {tab.label}
               </div>

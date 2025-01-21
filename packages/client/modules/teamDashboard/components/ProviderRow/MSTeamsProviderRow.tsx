@@ -1,6 +1,6 @@
 import {Add as AddIcon, Close as CloseIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
+import {useState} from 'react'
 import {useFragment} from 'react-relay'
 import {MSTeamsProviderRow_viewer$key} from '~/__generated__/MSTeamsProviderRow_viewer.graphql'
 import MSTeamsProviderLogo from '../../../../components/MSTeamsProviderLogo'
@@ -18,13 +18,11 @@ interface Props {
 }
 
 graphql`
-  fragment MSTeamsProviderRowTeamMember on TeamMember {
-    integrations {
-      msTeams {
-        auth {
-          provider {
-            id
-          }
+  fragment MSTeamsProviderRowTeamMemberIntegrations on TeamMemberIntegrations {
+    msTeams {
+      auth {
+        provider {
+          id
         }
       }
     }
@@ -37,7 +35,9 @@ const MSTeamsProviderRow = (props: Props) => {
       fragment MSTeamsProviderRow_viewer on User {
         ...MSTeamsPanel_viewer
         teamMember(teamId: $teamId) {
-          ...MSTeamsProviderRowTeamMember @relay(mask: false)
+          integrations {
+            ...MSTeamsProviderRowTeamMemberIntegrations @relay(mask: false)
+          }
         }
       }
     `,
@@ -51,6 +51,9 @@ const MSTeamsProviderRow = (props: Props) => {
   const {integrations} = teamMember!
   const {msTeams} = integrations
   const {auth} = msTeams
+
+  if (window.__ACTION__.msTeamsDisabled) return null
+
   return (
     <>
       <ProviderRow

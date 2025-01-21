@@ -1,14 +1,13 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import {MeetingSidebarTeamMemberStageItems_meeting$key} from '~/__generated__/MeetingSidebarTeamMemberStageItems_meeting.graphql'
+import {NewMeetingPhaseTypeEnum} from '../__generated__/ActionMeeting_meeting.graphql'
 import Avatar from '../components/Avatar/Avatar'
 import MeetingSubnavItem from '../components/MeetingSubnavItem'
 import useAnimatedPhaseListChildren from '../hooks/useAnimatedPhaseListChildren'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useGotoStageId from '../hooks/useGotoStageId'
-import {NewMeetingPhaseTypeEnum} from '../__generated__/ActionMeeting_meeting.graphql'
 import MeetingSidebarPhaseItemChild from './MeetingSidebarPhaseItemChild'
 
 const AvatarBlock = styled('div')({
@@ -61,7 +60,9 @@ const MeetingSidebarTeamMemberStageItems = (props: Props) => {
     const teamMemberStage =
       sidebarPhase && sidebarPhase.stages.find((stage) => stage.teamMemberId === teamMemberId)
     const teamMemberStageId = (teamMemberStage && teamMemberStage.id) || ''
-    gotoStageId(teamMemberStageId).catch()
+    gotoStageId(teamMemberStageId).catch(() => {
+      /*ignore*/
+    })
     handleMenuClick()
   }
   const atmosphere = useAtmosphere()
@@ -94,7 +95,7 @@ const MeetingSidebarTeamMemberStageItems = (props: Props) => {
               key={stageId}
               metaContent={
                 <AvatarBlock>
-                  <Avatar hasBadge={false} picture={picture} size={24} />
+                  <Avatar picture={picture} className='h-6 w-6' />
                 </AvatarBlock>
               }
               isDisabled={isViewerFacilitator ? !isNavigableByFacilitator : !isNavigable}

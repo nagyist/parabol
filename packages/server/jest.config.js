@@ -4,10 +4,18 @@ module.exports = {
   testEnvironment: 'node',
   transform: {
     '\\.(gql|graphql)$': './__tests__/jest-transform-graphql-shim.js',
-    '^.+\\.tsx?$': [
-      'ts-jest',
+    '^.+\\.(t|j)sx?$': [
+      '@swc/jest',
       {
-        diagnostics: false
+        jsc: {
+          transform: {
+            react: {
+              runtime: 'automatic'
+            },
+            // abstract classes will lose their default values when compiled with SWC
+            useDefineForClassFields: false
+          }
+        }
       }
     ]
   },

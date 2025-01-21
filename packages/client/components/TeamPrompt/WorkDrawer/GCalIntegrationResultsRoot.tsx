@@ -1,12 +1,12 @@
-import React, {Suspense} from 'react'
-import useQueryLoaderNow from '../../../hooks/useQueryLoaderNow'
+import ms from 'ms'
+import {Suspense} from 'react'
+import {Loader} from '~/utils/relay/renderLoader'
 import gcalIntegrationResultsQuery, {
   GCalIntegrationResultsQuery
 } from '../../../__generated__/GCalIntegrationResultsQuery.graphql'
+import useQueryLoaderNow from '../../../hooks/useQueryLoaderNow'
 import ErrorBoundary from '../../ErrorBoundary'
 import GCalIntegrationResults from './GCalIntegrationResults'
-import {Loader} from '~/utils/relay/renderLoader'
-import ms from 'ms'
 
 interface Props {
   teamId: string
@@ -44,7 +44,9 @@ const GCalIntegrationResultsRoot = (props: Props) => {
   return (
     <ErrorBoundary>
       <Suspense fallback={<Loader />}>
-        {queryRef && <GCalIntegrationResults queryRef={queryRef} order={eventRange.order} />}
+        {queryRef && (
+          <GCalIntegrationResults queryRef={queryRef} order={eventRange.order} teamId={teamId} />
+        )}
       </Suspense>
     </ErrorBoundary>
   )

@@ -1,12 +1,11 @@
 import {GraphQLID, GraphQLList, GraphQLNonNull} from 'graphql'
+import {Insertable} from 'kysely'
 import {SubscriptionChannel, Threshold} from 'parabol-client/types/constEnums'
-import {Writeable} from '../../../client/types/generics'
 import {ESTIMATE_TASK_SORT_ORDER} from '../../../client/utils/constants'
-import getRethink from '../../database/rethinkDriver'
 import EstimateStage from '../../database/types/EstimateStage'
-import MeetingPoker from '../../database/types/MeetingPoker'
-import {TaskServiceEnum} from '../../database/types/Task'
-import insertDiscussions, {InputDiscussions} from '../../postgres/queries/insertDiscussions'
+import getKysely from '../../postgres/getKysely'
+import {Discussion} from '../../postgres/types/pg'
+import {TaskServiceEnum} from '../../postgres/types/TaskIntegration'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import getPhase from '../../utils/getPhase'
 import getRedis from '../../utils/getRedis'
@@ -42,7 +41,7 @@ const updatePokerScope = {
     {meetingId, updates}: {meetingId: string; updates: TUpdatePokerScopeItemInput[]},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) => {
-    const r = await getRethink()
+    const pg = getKysely()
     const redis = getRedis()
     const viewerId = getUserId(authToken)
     const operationId = dataLoader.share()
@@ -55,22 +54,20 @@ const updatePokerScope = {
     // Wrap everything in try catch to ensure the lock is released
     try {
       //AUTH
-      const meeting = (await dataLoader.get('newMeetings').load(meetingId)) as MeetingPoker
+      const meeting = await dataLoader.get('newMeetings').load(meetingId)
       if (!meeting) {
         return {error: {message: `Meeting not found`}}
       }
-
-      const {endedAt, teamId, phases, meetingType, templateRefId, facilitatorStageId} = meeting
+      if (meeting.meetingType !== 'poker') {
+        return {error: {message: 'Not a poker meeting'}}
+      }
+      const {endedAt, teamId, phases, templateRefId, facilitatorStageId} = meeting
       if (!isTeamMember(authToken, teamId)) {
         // bad actors could be naughty & just lock meetings that they don't own. Limit bad actors to team members
         return {error: {message: `Not on team`}}
       }
       if (endedAt) {
         return {error: {message: `Meeting already ended`}}
-      }
-
-      if (meetingType !== 'poker') {
-        return {error: {message: 'Not a poker meeting'}}
       }
 
       // RESOLUTION
@@ -112,7 +109,7 @@ const updatePokerScope = {
       // add stages
       const templateRef = await dataLoader.get('templateRefs').loadNonNull(templateRefId)
       const {dimensions} = templateRef
-      const newDiscussions = [] as Writeable<InputDiscussions>
+      const newDiscussions = [] as Insertable<Discussion>[]
       const additiveUpdates = updates.filter((update) => {
         const {action, serviceTaskId} = update
         return action === 'ADD' && !stages.find((stage) => stage.serviceTaskId === serviceTaskId)
@@ -158,18 +155,19 @@ const updatePokerScope = {
       if (stages.length > Threshold.MAX_POKER_STORIES * dimensions.length) {
         return {error: {message: 'Story limit reached'}}
       }
-      await r
-        .table('NewMeeting')
-        .get(meetingId)
-        .update({
+
+      await pg
+        .updateTable('NewMeeting')
+        .set({
           facilitatorStageId: meeting.facilitatorStageId,
-          phases,
-          updatedAt: now
+          phases: JSON.stringify(phases)
         })
-        .run()
+        .where('id', '=', meetingId)
+        .execute()
       if (newDiscussions.length > 0) {
-        await insertDiscussions(newDiscussions)
+        await getKysely().insertInto('Discussion').values(newDiscussions).execute()
       }
+      dataLoader.clearAll(['newMeetings'])
       const data = {meetingId, newStageIds}
       publish(SubscriptionChannel.MEETING, meetingId, 'UpdatePokerScopeSuccess', data, subOptions)
       return data

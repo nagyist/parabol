@@ -153,7 +153,11 @@ export default {
         '700': '#444258',
         '800': '#2D2D39',
         '900': '#1C1C21'
-      }
+      },
+      'success-light': '#2db553',
+      starter: '#F2E1F7',
+      team: '#CBECF0',
+      enterprise: '#FFE2E0'
     },
     keyframes: {
       overlayShow: {
@@ -168,12 +172,34 @@ export default {
           opacity: 0,
           transform: 'scale(0)'
         }
+      },
+      slideUp: {
+        from: {
+          opacity: 0,
+          transform: 'translateY(10px)'
+        },
+        to: {
+          opacity: 1,
+          transform: 'translateY(0)'
+        }
+      },
+      slideDown: {
+        from: {
+          opacity: 0,
+          transform: 'translateY(-10px)'
+        },
+        to: {
+          opacity: 1,
+          transform: 'translateY(0)'
+        }
       }
     },
     animation: {
       overlayShow: 'overlayShow 150ms cubic-bezier(0.16, 1, 0.3, 1)',
       contentShow: 'contentShow 150ms cubic-bezier(0.16, 1, 0.3, 1)',
-      scaleIn: 'scaleIn 150ms cubic-bezier(0, 0, .2, 1)'
+      scaleIn: 'scaleIn 150ms cubic-bezier(0, 0, .2, 1)',
+      slideUp: 'slideUp 200ms cubic-bezier(0, 0, 0.2, 1)',
+      slideDown: 'slideDown 200ms cubic-bezier(0, 0, 0.2, 1)'
     }
   }
 } as const

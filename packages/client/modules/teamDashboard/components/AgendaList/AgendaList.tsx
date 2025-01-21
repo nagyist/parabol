@@ -1,6 +1,6 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo} from 'react'
+import {useMemo} from 'react'
 import {DragDropContext, Draggable, Droppable, DropResult} from 'react-beautiful-dnd'
 import {useFragment} from 'react-relay'
 import {AgendaList_agendaItems$key} from '~/__generated__/AgendaList_agendaItems.graphql'
@@ -9,9 +9,9 @@ import useAtmosphere from '../../../../hooks/useAtmosphere'
 import useEventCallback from '../../../../hooks/useEventCallback'
 import useGotoStageId from '../../../../hooks/useGotoStageId'
 import UpdateAgendaItemMutation from '../../../../mutations/UpdateAgendaItemMutation'
+import {getSortOrder} from '../../../../shared/sortOrder'
 import {navItemRaised} from '../../../../styles/elevation'
-import {AGENDA_ITEM, SORT_STEP} from '../../../../utils/constants'
-import dndNoise from '../../../../utils/dndNoise'
+import {AGENDA_ITEM} from '../../../../utils/constants'
 import AgendaItem from '../AgendaItem/AgendaItem'
 import AgendaListEmptyState from './AgendaListEmptyState'
 
@@ -33,7 +33,7 @@ interface Props {
   agendaItems: AgendaList_agendaItems$key
   dashSearch?: string
   gotoStageId: ReturnType<typeof useGotoStageId> | undefined
-  meeting: AgendaList_meeting$key | null
+  meeting: AgendaList_meeting$key | null | undefined
 }
 
 const AgendaList = (props: Props) => {
@@ -83,17 +83,7 @@ const AgendaList = (props: Props) => {
       return
     }
 
-    let sortOrder
-    if (destination.index === 0) {
-      sortOrder = destinationItem.sortOrder - SORT_STEP + dndNoise()
-    } else if (destination.index === agendaItems.length - 1) {
-      sortOrder = destinationItem.sortOrder + SORT_STEP + dndNoise()
-    } else {
-      const offset = source.index > destination.index ? -1 : 1
-      sortOrder =
-        (agendaItems[destination.index + offset]!.sortOrder + destinationItem.sortOrder) / 2 +
-        dndNoise()
-    }
+    const sortOrder = getSortOrder(agendaItems, source.index, destination.index)
     UpdateAgendaItemMutation(
       atmosphere,
       {updatedAgendaItem: {id: sourceItem.id, sortOrder}},

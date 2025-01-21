@@ -1,12 +1,12 @@
-import React, {forwardRef} from 'react'
 import graphql from 'babel-plugin-relay/macro'
+import {forwardRef} from 'react'
 import {useFragment} from 'react-relay'
-import useSegmentTrack from '../../hooks/useSegmentTrack'
+import {TeamHealthHelpMenu_stage$key} from '~/__generated__/TeamHealthHelpMenu_stage.graphql'
+import useClientSideTrack from '../../hooks/useClientSideTrack'
 import {phaseLabelLookup} from '../../utils/meetings/lookups'
 import HelpMenuContent from './HelpMenuContent'
 import HelpMenuCopy from './HelpMenuCopy'
 import HelpMenuHeader from './HelpMenuHeader'
-import {TeamHealthHelpMenu_stage$key} from '~/__generated__/TeamHealthHelpMenu_stage.graphql'
 
 interface Props {
   stageRef: TeamHealthHelpMenu_stage$key
@@ -83,7 +83,7 @@ const VeryMixed = () => (
 const TeamHealthHelpMenu = forwardRef((props: Props, ref: any) => {
   const {stageRef} = props
   const {closePortal} = ref
-  useSegmentTrack('Help Menu Open', {phase: 'TEAM_HEALTH'})
+  useClientSideTrack('Help Menu Open', {phase: 'TEAM_HEALTH'})
 
   const stage = useFragment(
     graphql`

@@ -1,5 +1,6 @@
 import getPg from '../../packages/server/postgres/getPg'
 import upsertIntegrationProvider from '../../packages/server/postgres/queries/upsertIntegrationProvider'
+import {Logger} from '../../packages/server/utils/Logger'
 
 const upsertGlobalIntegrationProvidersFromEnv = async () => {
   const providers = [
@@ -7,8 +8,7 @@ const upsertGlobalIntegrationProvidersFromEnv = async () => {
       service: 'gitlab',
       authStrategy: 'oauth2',
       scope: 'global',
-      teamId: 'aGhostTeam',
-      serverBaseUrl: 'https://gitlab.com',
+      serverBaseUrl: process.env.GITLAB_SERVER_URL,
       clientId: process.env.GITLAB_CLIENT_ID,
       clientSecret: process.env.GITLAB_CLIENT_SECRET
     },
@@ -16,7 +16,6 @@ const upsertGlobalIntegrationProvidersFromEnv = async () => {
       service: 'azureDevOps',
       authStrategy: 'oauth2',
       scope: 'global',
-      teamId: 'aGhostTeam',
       serverBaseUrl: 'https://dev.azure.com',
       clientId: process.env.AZURE_DEVOPS_CLIENT_ID,
       clientSecret: process.env.AZURE_DEVOPS_CLIENT_SECRET,
@@ -27,14 +26,13 @@ const upsertGlobalIntegrationProvidersFromEnv = async () => {
       service: 'gcal',
       authStrategy: 'oauth2',
       scope: 'global',
-      teamId: 'aGhostTeam',
       serverBaseUrl: 'https://www.googleapis.com/calendar/v3',
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
       clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET
     }
   ] as const
 
-  const validProviders = providers.filter(({clientId, clientSecret}) => clientId && clientSecret)
+  const validProviders = providers.filter(({clientId, clientSecret, serverBaseUrl}) => clientId && clientSecret && serverBaseUrl)
   await Promise.all(
     validProviders.map((provider) => {
       return upsertIntegrationProvider(provider)
@@ -43,11 +41,9 @@ const upsertGlobalIntegrationProvidersFromEnv = async () => {
 }
 
 const primeIntegrations = async () => {
-  console.log('⛓️ Prime Integrationgs Started')
-  const pg = getPg()
+  Logger.log('⛓️ Prime Integrationgs Started')
   await upsertGlobalIntegrationProvidersFromEnv()
-  await pg.end()
-  console.log('⛓️ Prime Integrations Complete')
+  Logger.log('⛓️ Prime Integrations Complete')
 }
 
 export default primeIntegrations

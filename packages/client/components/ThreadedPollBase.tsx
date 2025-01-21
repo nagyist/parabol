@@ -1,6 +1,6 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
+import {useState} from 'react'
 import {useFragment} from 'react-relay'
 import {ThreadedPollBase_discussion$key} from '~/__generated__/ThreadedPollBase_discussion.graphql'
 import {ThreadedPollBase_poll$key} from '~/__generated__/ThreadedPollBase_poll.graphql'
@@ -13,11 +13,11 @@ import PlainButton from './PlainButton/PlainButton'
 import {AddPollOptionButton} from './Poll/AddPollOptionButton'
 import EditablePollOption from './Poll/EditablePollOption'
 import EditablePollTitle from './Poll/EditablePollTitle'
-import {addLocalPollOption} from './Poll/local/newPoll'
 import Poll from './Poll/Poll'
 import PollOption from './Poll/PollOption'
 import {getPollState} from './Poll/PollState'
 import PollTitle from './Poll/PollTitle'
+import {addLocalPollOption} from './Poll/local/newPoll'
 
 const PollOptions = styled('div')({
   fontSize: '14px',

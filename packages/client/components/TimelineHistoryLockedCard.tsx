@@ -1,15 +1,15 @@
 import styled from '@emotion/styled'
 import {Lock} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect, useRef} from 'react'
+import {useEffect, useRef} from 'react'
 import {useFragment} from 'react-relay'
+import {TimelineHistoryLockedCard_organization$key} from '../__generated__/TimelineHistoryLockedCard_organization.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useIsVisible from '../hooks/useIsVisible'
 import useRouter from '../hooks/useRouter'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
 import {cardShadow} from '../styles/elevation'
 import {PALETTE} from '../styles/paletteV3'
-import {TimelineHistoryLockedCard_organization$key} from '../__generated__/TimelineHistoryLockedCard_organization.graphql'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 import PrimaryButton from './PrimaryButton'
 
 interface Props {
@@ -82,7 +82,7 @@ const TimelineHistoryLockedCard = (props: Props) => {
   const visible = useIsVisible(cardRef.current, 0.7)
   useEffect(() => {
     if (visible) {
-      SendClientSegmentEventMutation(atmosphere, 'Upgrade CTA Viewed', {
+      SendClientSideEvent(atmosphere, 'Upgrade CTA Viewed', {
         upgradeCTALocation: 'timelineHistoryLock',
         upgradeTier: 'team',
         orgId
@@ -91,7 +91,7 @@ const TimelineHistoryLockedCard = (props: Props) => {
   }, [visible])
 
   const onClick = () => {
-    SendClientSegmentEventMutation(atmosphere, 'Upgrade CTA Clicked', {
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Clicked', {
       upgradeCTALocation: 'timelineHistoryLock',
       upgradeTier: 'team',
       orgId

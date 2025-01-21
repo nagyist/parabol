@@ -1,9 +1,9 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useRef} from 'react'
+import {useRef} from 'react'
 import {useFragment} from 'react-relay'
-import useBreakpoint from '~/hooks/useBreakpoint'
 import {ActionMeetingAgendaItems_meeting$key} from '~/__generated__/ActionMeetingAgendaItems_meeting.graphql'
+import useBreakpoint from '~/hooks/useBreakpoint'
 import EditorHelpModalContainer from '../containers/EditorHelpModalContainer/EditorHelpModalContainer'
 import MeetingCopy from '../modules/meeting/components/MeetingCopy/MeetingCopy'
 import MeetingPhaseHeading from '../modules/meeting/components/MeetingPhaseHeading/MeetingPhaseHeading'
@@ -19,6 +19,7 @@ import MeetingHeaderAndPhase from './MeetingHeaderAndPhase'
 import MeetingTopBar from './MeetingTopBar'
 import PhaseHeaderTitle from './PhaseHeaderTitle'
 import PhaseWrapper from './PhaseWrapper'
+import StageTimerDisplay from './StageTimerDisplay'
 
 interface Props extends ActionMeetingPhaseProps {
   meeting: ActionMeetingAgendaItems_meeting$key
@@ -57,6 +58,8 @@ const ActionMeetingAgendaItems = (props: Props) => {
   const meeting = useFragment(
     graphql`
       fragment ActionMeetingAgendaItems_meeting on ActionMeeting {
+        ...StageTimerDisplay_meeting
+        ...StageTimerControl_meeting
         showSidebar
         endedAt
         facilitatorUserId
@@ -93,10 +96,11 @@ const ActionMeetingAgendaItems = (props: Props) => {
         </MeetingTopBar>
         <PhaseWrapper>
           <AgendaVerbatim>
-            <Avatar picture={picture} size={64} />
+            <Avatar picture={picture} className={'h-16 w-16'} />
             <StyledHeading>{content}</StyledHeading>
           </AgendaVerbatim>
           <StyledCopy>{`${preferredName}, what do you need?`}</StyledCopy>
+          <StageTimerDisplay meeting={meeting} />
           <ThreadColumn isDesktop={isDesktop}>
             <DiscussionThreadRoot
               meetingContentRef={meetingContentRef}

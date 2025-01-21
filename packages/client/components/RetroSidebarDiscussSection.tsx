@@ -1,16 +1,15 @@
 import styled from '@emotion/styled'
 import {ThumbUp} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {DragDropContext, Draggable, Droppable, DropResult} from 'react-beautiful-dnd'
 import {useFragment} from 'react-relay'
+import {
+  RetroSidebarDiscussSection_meeting$data,
+  RetroSidebarDiscussSection_meeting$key
+} from '~/__generated__/RetroSidebarDiscussSection_meeting.graphql'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import useGotoStageId from '~/hooks/useGotoStageId'
 import {DeepNonNullable} from '~/types/generics'
-import {
-  RetroSidebarDiscussSection_meeting$key,
-  RetroSidebarDiscussSection_meeting$data
-} from '~/__generated__/RetroSidebarDiscussSection_meeting.graphql'
 import DragDiscussionTopicMutation from '../mutations/DragDiscussionTopicMutation'
 import {navItemRaised} from '../styles/elevation'
 import {PALETTE} from '../styles/paletteV3'
@@ -126,7 +125,9 @@ const RetroSidebarDiscussSection = (props: Props) => {
   }
 
   const handleClick = (id: string) => {
-    gotoStageId(id).catch()
+    gotoStageId(id).catch(() => {
+      /*ignore*/
+    })
     handleMenuClick()
   }
   return (

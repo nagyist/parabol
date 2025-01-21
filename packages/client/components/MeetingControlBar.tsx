@@ -1,7 +1,8 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useRef} from 'react'
+import {useRef} from 'react'
 import {useFragment} from 'react-relay'
+import {MeetingControlBar_meeting$key} from '~/__generated__/MeetingControlBar_meeting.graphql'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import useBreakpoint from '~/hooks/useBreakpoint'
 import {useCovering} from '~/hooks/useControlBarCovers'
@@ -15,10 +16,10 @@ import {PALETTE} from '~/styles/paletteV3'
 import {BezierCurve, Breakpoint, ElementWidth, ZIndex} from '~/types/constEnums'
 import makeMinWidthMediaQuery from '~/utils/makeMinWidthMediaQuery'
 import findStageAfterId from '~/utils/meetings/findStageAfterId'
-import {MeetingControlBar_meeting$key} from '~/__generated__/MeetingControlBar_meeting.graphql'
+import {NewMeetingPhaseTypeEnum} from '../__generated__/MeetingControlBar_meeting.graphql'
 import useClickConfirmation from '../hooks/useClickConfirmation'
 import {bottomBarShadow, desktopBarShadow} from '../styles/elevation'
-import {NewMeetingPhaseTypeEnum} from '../__generated__/MeetingControlBar_meeting.graphql'
+import showTimerInPhase from '../utils/showTimerInPhase'
 import BottomControlBarReady from './BottomControlBarReady'
 import BottomControlBarRejoin from './BottomControlBarRejoin'
 import BottomControlBarTips from './BottomControlBarTips'
@@ -57,7 +58,8 @@ const DEFAULT_TIME_LIMIT = {
   vote: 3,
   discuss: 5,
   ESTIMATE: 5,
-  SCOPE: 3
+  SCOPE: 3,
+  TEAM_HEALTH: 1
 } as Record<NewMeetingPhaseTypeEnum, number>
 
 interface Props {
@@ -123,13 +125,12 @@ const MeetingControlBar = (props: Props) => {
   const {phaseType} = localPhase
   const {id: localStageId, isComplete} = localStage
   const isCheckIn = phaseType === 'checkin'
-  const isRetro = meetingType === 'retrospective'
   const isPoker = meetingType === 'poker'
   const getPossibleButtons = () => {
     const buttons = ['tips']
     if (!isFacilitating && !isCheckIn && !isComplete && !isPoker) buttons.push('ready')
     if (!isFacilitating && localStageId !== facilitatorStageId) buttons.push('rejoin')
-    if (isFacilitating && isRetro && !isCheckIn && !isComplete) buttons.push('timer')
+    if (isFacilitating && !isComplete && showTimerInPhase(phaseType)) buttons.push('timer')
     if ((isFacilitating || isPoker) && findStageAfterId(phases, localStageId)) buttons.push('next')
     if (isFacilitating) buttons.push('end')
     return buttons.map((key) => ({key}))
@@ -203,7 +204,7 @@ const MeetingControlBar = (props: Props) => {
                 <StageTimerControl
                   {...tranProps}
                   cancelConfirm={cancelConfirm}
-                  defaultTimeLimit={DEFAULT_TIME_LIMIT[phaseType]}
+                  defaultTimeLimit={DEFAULT_TIME_LIMIT[phaseType] ?? 1}
                   meeting={meeting}
                 />
               )

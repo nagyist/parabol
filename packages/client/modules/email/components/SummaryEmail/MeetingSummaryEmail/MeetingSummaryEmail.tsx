@@ -1,5 +1,6 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect} from 'react'
+import * as React from 'react'
+import {useEffect} from 'react'
 import {useFragment} from 'react-relay'
 import {CorsOptions} from '../../../../../types/cors'
 // import './reactEmailDeclarations'
@@ -34,20 +35,6 @@ interface Props {
 
 const pagePadding = {
   paddingTop: 24
-}
-
-declare module 'react' {
-  interface TdHTMLAttributes<T> {
-    height?: string | number
-    width?: string | number
-    bgcolor?: string
-  }
-  interface TableHTMLAttributes<T> {
-    align?: 'center' | 'left' | 'right'
-    bgcolor?: string
-    height?: string | number
-    width?: string | number
-  }
 }
 
 const PagePadding = () => {

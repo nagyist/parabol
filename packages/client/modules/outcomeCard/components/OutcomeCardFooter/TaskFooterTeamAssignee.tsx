@@ -1,8 +1,8 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import useTooltip from '~/hooks/useTooltip'
+import {TaskFooterTeamAssignee_task$key} from '../../../../__generated__/TaskFooterTeamAssignee_task.graphql'
 import CardButton from '../../../../components/CardButton'
 import {MenuPosition} from '../../../../hooks/useCoords'
 import useMenu from '../../../../hooks/useMenu'
@@ -11,7 +11,6 @@ import textOverflow from '../../../../styles/helpers/textOverflow'
 import {PALETTE} from '../../../../styles/paletteV3'
 import {Radius} from '../../../../types/constEnums'
 import lazyPreload from '../../../../utils/lazyPreload'
-import {TaskFooterTeamAssignee_task$key} from '../../../../__generated__/TaskFooterTeamAssignee_task.graphql'
 
 const TooltipToggle = styled('div')({
   width: '100%'

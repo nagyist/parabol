@@ -1,11 +1,11 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {RefObject} from 'react'
+import {RefObject} from 'react'
 import {useFragment} from 'react-relay'
 import useBreakpoint from '~/hooks/useBreakpoint'
 import {Breakpoint} from '~/types/constEnums'
-import {PALETTE} from '../styles/paletteV3'
 import {PokerDimensionFinalScorePicker_stage$key} from '../__generated__/PokerDimensionFinalScorePicker_stage.graphql'
+import {PALETTE} from '../styles/paletteV3'
 import AzureDevOpsFieldDimensionDropdown from './AzureDevOpsFieldDimensionDropdown'
 import GitHubFieldDimensionDropdown from './GitHubFieldDimensionDropdown'
 import GitLabFieldDimensionDropdown from './GitLabFieldDimensionDropdown'
@@ -102,7 +102,7 @@ const PokerDimensionFinalScorePicker = (props: Props) => {
   const titleByType = {
     _xGitHubIssue: 'GitHub',
     JiraIssue: 'Jira',
-    JiraServerIssue: 'Jira Server',
+    JiraServerIssue: 'Jira Data Center',
     _xGitLabIssue: 'GitLab',
     AzureDevOpsWorkItem: 'Azure DevOps'
   } as const

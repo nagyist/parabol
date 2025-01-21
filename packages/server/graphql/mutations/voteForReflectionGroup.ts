@@ -2,8 +2,7 @@ import {GraphQLBoolean, GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import {VOTE} from 'parabol-client/utils/constants'
 import isPhaseComplete from 'parabol-client/utils/meetings/isPhaseComplete'
-import getRethink from '../../database/rethinkDriver'
-import MeetingRetrospective from '../../database/types/MeetingRetrospective'
+import MeetingMemberId from '../../../client/shared/gqlIds/MeetingMemberId'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
@@ -29,13 +28,12 @@ export default {
     {isUnvote = false, reflectionGroupId}: {isUnvote: boolean; reflectionGroupId: string},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
     const operationId = dataLoader.share()
     const subOptions = {operationId, mutatorId}
 
     // AUTH
     const viewerId = getUserId(authToken)
-    const reflectionGroup = await r.table('RetroReflectionGroup').get(reflectionGroupId).run()
+    const reflectionGroup = await dataLoader.get('retroReflectionGroups').load(reflectionGroupId)
     if (!reflectionGroup || !reflectionGroup.isActive) {
       return standardError(new Error('Reflection group not found'), {
         userId: viewerId,
@@ -43,8 +41,11 @@ export default {
       })
     }
     const {meetingId} = reflectionGroup
-    const meeting = (await r.table('NewMeeting').get(meetingId).run()) as MeetingRetrospective
-    const {endedAt, phases, maxVotesPerGroup, teamId} = meeting
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
+    if (meeting.meetingType !== 'retrospective') {
+      return {error: {message: 'Meeting type is not retrospective'}}
+    }
+    const {endedAt, phases, teamId} = meeting
     if (!isTeamMember(authToken, teamId)) {
       return standardError(new Error('Team not found'), {userId: viewerId})
     }
@@ -54,36 +55,22 @@ export default {
     }
 
     // VALIDATION
-    const meetingMember = await r
-      .table('MeetingMember')
-      .getAll(meetingId, {index: 'meetingId'})
-      .filter({userId: viewerId})
-      .nth(0)
-      .default(null)
-      .run()
+    const meetingMemberId = MeetingMemberId.join(meetingId, viewerId)
+    const meetingMember = await dataLoader.get('meetingMembers').load(meetingMemberId)
     if (!meetingMember) {
       return standardError(new Error('Meeting member not found'), {userId: viewerId})
     }
 
     // RESOLUTION
+    dataLoader.get('retroReflectionGroups').clear(reflectionGroupId)
     if (isUnvote) {
-      const votingError = await safelyWithdrawVote(
-        authToken,
-        meetingId,
-        viewerId,
-        reflectionGroupId
-      )
+      const votingError = await safelyWithdrawVote(meetingId, viewerId, reflectionGroupId)
       if (votingError) return votingError
     } else {
-      const votingError = await safelyCastVote(
-        authToken,
-        meetingId,
-        viewerId,
-        reflectionGroupId,
-        maxVotesPerGroup
-      )
+      const votingError = await safelyCastVote(meetingId, viewerId, reflectionGroupId)
       if (votingError) return votingError
     }
+    dataLoader.clearAll('meetingMembers')
 
     const data = {
       meetingId,

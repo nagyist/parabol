@@ -1,8 +1,8 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {handleSuccessfulLogin} from '~/utils/handleSuccessfulLogin'
-import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {SignUpWithPasswordMutation as TSignUpWithPasswordMutation} from '../__generated__/SignUpWithPasswordMutation.graphql'
+import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {handleAcceptTeamInvitationErrors} from './AcceptTeamInvitationMutation'
 import handleAuthenticationRedirect from './handlers/handleAuthenticationRedirect'
 
@@ -11,7 +11,7 @@ const mutation = graphql`
     $email: ID!
     $password: String!
     $invitationToken: ID!
-    $segmentId: ID
+    $pseudoId: ID
     $isInvitation: Boolean!
     $params: String!
   ) {
@@ -19,7 +19,7 @@ const mutation = graphql`
       email: $email
       password: $password
       invitationToken: $invitationToken
-      segmentId: $segmentId
+      pseudoId: $pseudoId
       params: $params
     ) {
       error {
@@ -47,9 +47,15 @@ const SignUpWithPasswordMutation: StandardMutation<
       handleAcceptTeamInvitationErrors(atmosphere, acceptTeamInvitation)
       if (!uiError && !errors) {
         handleSuccessfulLogin(signUpWithPassword)
-        const authToken = acceptTeamInvitation?.authToken ?? signUpWithPassword.authToken
+        const authToken = acceptTeamInvitation?.authToken || signUpWithPassword.authToken!
         atmosphere.setAuthToken(authToken)
-        handleAuthenticationRedirect(acceptTeamInvitation, {atmosphere, history})
+        const redirectPath = '/meetings'
+
+        handleAuthenticationRedirect(acceptTeamInvitation, {
+          atmosphere,
+          history,
+          redirectPath
+        })
       }
     }
   })

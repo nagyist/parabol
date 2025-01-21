@@ -1,18 +1,17 @@
 import {generateText, JSONContent} from '@tiptap/core'
-import {createEditorExtensions} from 'parabol-client/components/promptResponse/tiptapConfig'
 import TeamPromptResponseId from 'parabol-client/shared/gqlIds/TeamPromptResponseId'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import {TeamPromptResponse} from '../../../postgres/queries/getTeamPromptResponsesByIds'
+import {serverTipTapExtensions} from '../../../../client/shared/tiptap/serverTipTapExtensions'
 import {upsertTeamPromptResponse as upsertTeamPromptResponseQuery} from '../../../postgres/queries/upsertTeamPromptResponses'
+import {TeamPromptResponse} from '../../../postgres/types'
 import {analytics} from '../../../utils/analytics/analytics'
 import {getUserId, isTeamMember} from '../../../utils/authorization'
 import publish from '../../../utils/publish'
 import standardError from '../../../utils/standardError'
+import {IntegrationNotifier} from '../../mutations/helpers/notifications/IntegrationNotifier'
 import {MutationResolvers} from '../resolverTypes'
 import publishNotification from './helpers/publishNotification'
 import createTeamPromptMentionNotifications from './helpers/publishTeamPromptMentions'
-import {IntegrationNotifier} from '../../mutations/helpers/notifications/IntegrationNotifier'
-
 const upsertTeamPromptResponse: MutationResolvers['upsertTeamPromptResponse'] = async (
   _source,
   {teamPromptResponseId: inputTeamPromptResponseId, meetingId, content},
@@ -28,7 +27,7 @@ const upsertTeamPromptResponse: MutationResolvers['upsertTeamPromptResponse'] = 
   if (inputTeamPromptResponseId) {
     oldTeamPromptResponse = await dataLoader
       .get('teamPromptResponses')
-      .load(inputTeamPromptResponseId)
+      .load(TeamPromptResponseId.split(inputTeamPromptResponseId))
     if (!oldTeamPromptResponse) {
       return standardError(new Error('TeamPromptResponse not found'), {userId: viewerId})
     }
@@ -40,7 +39,10 @@ const upsertTeamPromptResponse: MutationResolvers['upsertTeamPromptResponse'] = 
       return standardError(new Error("Can't edit response in another meeting"), {userId: viewerId})
     }
   }
-  const meeting = await dataLoader.get('newMeetings').load(meetingId)
+  const [meeting, user] = await Promise.all([
+    dataLoader.get('newMeetings').load(meetingId),
+    dataLoader.get('users').loadNonNull(viewerId)
+  ])
   if (!meeting) {
     return standardError(new Error('Meeting not found'), {userId: viewerId})
   }
@@ -60,20 +62,18 @@ const upsertTeamPromptResponse: MutationResolvers['upsertTeamPromptResponse'] = 
 
   let plaintextContent: string
   try {
-    plaintextContent = generateText(contentJSON, createEditorExtensions())
+    plaintextContent = generateText(contentJSON, serverTipTapExtensions)
   } catch (e) {
     return standardError(new Error('Invalid editor format'), {userId: viewerId})
   }
 
-  const teamPromptResponseId = TeamPromptResponseId.join(
-    await upsertTeamPromptResponseQuery({
-      meetingId,
-      userId: viewerId,
-      sortOrder: 0, //TODO: placeholder as currently it's defined as non-null. Might decide to remove the column entirely later.
-      content,
-      plaintextContent
-    })
-  )
+  const teamPromptResponseId = await upsertTeamPromptResponseQuery({
+    meetingId,
+    userId: viewerId,
+    sortOrder: 0, //TODO: placeholder as currently it's defined as non-null. Might decide to remove the column entirely later.
+    content,
+    plaintextContent
+  })
 
   dataLoader.get('teamPromptResponses').clear(teamPromptResponseId)
 
@@ -93,6 +93,7 @@ const upsertTeamPromptResponse: MutationResolvers['upsertTeamPromptResponse'] = 
   }
 
   notifications.forEach((notification) => {
+    IntegrationNotifier.sendNotificationToUser?.(dataLoader, notification.id, notification.userId)
     publishNotification(notification, subOptions)
   })
 
@@ -100,7 +101,7 @@ const upsertTeamPromptResponse: MutationResolvers['upsertTeamPromptResponse'] = 
     IntegrationNotifier.standupResponseSubmitted(dataLoader, meetingId, teamId, viewerId)
   }
 
-  analytics.responseAdded(viewerId, meetingId, teamPromptResponseId, !!inputTeamPromptResponseId)
+  analytics.responseAdded(user, meetingId, teamPromptResponseId, !!inputTeamPromptResponseId)
   publish(
     SubscriptionChannel.MEETING,
     meetingId,

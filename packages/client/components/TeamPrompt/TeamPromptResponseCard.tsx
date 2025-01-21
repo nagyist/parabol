@@ -1,9 +1,12 @@
 import styled from '@emotion/styled'
-import {Editor as EditorState} from '@tiptap/core'
+import {Link} from '@mui/icons-material'
+import {Editor} from '@tiptap/core'
 import {JSONContent} from '@tiptap/react'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo} from 'react'
+import {useMemo} from 'react'
+import CopyToClipboard from 'react-copy-to-clipboard'
 import {commitLocalUpdate, useFragment} from 'react-relay'
+import {TeamPromptResponseCard_stage$key} from '~/__generated__/TeamPromptResponseCard_stage.graphql'
 import useAnimatedCard from '~/hooks/useAnimatedCard'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import useEventCallback from '~/hooks/useEventCallback'
@@ -12,45 +15,31 @@ import {Elevation} from '~/styles/elevation'
 import {PALETTE} from '~/styles/paletteV3'
 import {BezierCurve, Card} from '~/types/constEnums'
 import plural from '~/utils/plural'
-import {TeamPromptResponseCard_stage$key} from '~/__generated__/TeamPromptResponseCard_stage.graphql'
+import {MenuPosition} from '../../hooks/useCoords'
 import useMutationProps from '../../hooks/useMutationProps'
+import useTooltip from '../../hooks/useTooltip'
 import UpsertTeamPromptResponseMutation from '../../mutations/UpsertTeamPromptResponseMutation'
+import SendClientSideEvent from '../../utils/SendClientSideEvent'
+import makeAppURL from '../../utils/makeAppURL'
+import {mergeRefs} from '../../utils/react/mergeRefs'
 import Avatar from '../Avatar/Avatar'
 import PlainButton from '../PlainButton/PlainButton'
 import PromptResponseEditor from '../promptResponse/PromptResponseEditor'
-import {ResponseCardDimensions, ResponsesGridBreakpoints} from './TeamPromptGridDimensions'
+import {ResponseCardDimensions} from './TeamPromptGridDimensions'
 import TeamPromptLastUpdatedTime from './TeamPromptLastUpdatedTime'
 import TeamPromptRepliesAvatarList from './TeamPromptRepliesAvatarList'
 import {TeamPromptResponseEmojis} from './TeamPromptResponseEmojis'
 
-const twoColumnResponseMediaQuery = `@media screen and (min-width: ${ResponsesGridBreakpoints.TWO_RESPONSE_COLUMN}px)`
-const threeColumnResponseMediaQuery = `@media screen and (min-width: ${ResponsesGridBreakpoints.THREE_RESPONSE_COLUMNS}px)`
-const fourColumnResponseMediaQuery = `@media screen and (min-width: ${ResponsesGridBreakpoints.FOUR_RESPONSE_COLUMNS}px)`
-const fiveColumnResponseMediaQuery = `@media screen and (min-width: ${ResponsesGridBreakpoints.FIVE_RESPONSE_COLUMNS}px)`
-
 const ResponseWrapper = styled('div')<{
   status: TransitionStatus
-  isSingleColumn: boolean
-}>(({status, isSingleColumn}) => ({
+}>(({status}) => ({
   opacity: status === TransitionStatus.MOUNTED || status === TransitionStatus.EXITING ? 0 : 1,
   transition: `box-shadow 100ms ${BezierCurve.DECELERATE}, opacity 300ms ${BezierCurve.DECELERATE}`,
   display: 'flex',
   flexDirection: 'column',
   width: '100%',
-  maxWidth: isSingleColumn ? '600px' : undefined,
-  margin: isSingleColumn ? '0 auto' : undefined,
-  [twoColumnResponseMediaQuery]: {
-    width: isSingleColumn ? undefined : `calc(100% / 2 - ${ResponseCardDimensions.GAP}px)`
-  },
-  [threeColumnResponseMediaQuery]: {
-    width: isSingleColumn ? undefined : `calc(100% / 3 - ${ResponseCardDimensions.GAP}px)`
-  },
-  [fourColumnResponseMediaQuery]: {
-    width: isSingleColumn ? undefined : `calc(100% / 4 - ${ResponseCardDimensions.GAP}px)`
-  },
-  [fiveColumnResponseMediaQuery]: {
-    width: isSingleColumn ? undefined : `calc(100% / 5 - ${ResponseCardDimensions.GAP}px)`
-  }
+  maxWidth: '600px',
+  margin: '0 auto'
 }))
 
 const ResponseHeader = styled('div')({
@@ -108,12 +97,11 @@ interface Props {
   stageRef: TeamPromptResponseCard_stage$key
   status: TransitionStatus
   displayIdx: number
-  isSingleColumn: boolean
   onTransitionEnd: () => void
 }
 
 const TeamPromptResponseCard = (props: Props) => {
-  const {stageRef, status, onTransitionEnd, displayIdx, isSingleColumn} = props
+  const {stageRef, status, onTransitionEnd, displayIdx} = props
   const responseStage = useFragment(
     graphql`
       fragment TeamPromptResponseCard_stage on TeamPromptResponseStage {
@@ -194,12 +182,12 @@ const TeamPromptResponseCard = (props: Props) => {
   const nonViewerEmptyResponsePlaceholder = isMeetingEnded ? 'No response' : 'No response yet...'
 
   const {onError, onCompleted, submitMutation, submitting} = useMutationProps()
-  const handleSubmit = useEventCallback((editorState: EditorState) => {
+  const handleSubmit = useEventCallback((editor: Editor) => {
     if (submitting) return
     submitMutation()
 
-    const content = JSON.stringify(editorState.getJSON())
-    const plaintextContent = editorState.getText()
+    const content = JSON.stringify(editor.getJSON())
+    const plaintextContent = editor.getText()
 
     UpsertTeamPromptResponseMutation(
       atmosphere,
@@ -210,15 +198,39 @@ const TeamPromptResponseCard = (props: Props) => {
 
   const ref = useAnimatedCard(displayIdx, status)
 
+  const responsePermalink = makeAppURL(window.location.origin, `/meet/${meetingId}/responses`, {
+    searchParams: {
+      utm_source: 'sharing',
+      responseId: response?.id
+    }
+  })
+
+  const {tooltipPortal, openTooltip, closeTooltip, originRef} = useTooltip<HTMLDivElement>(
+    MenuPosition.UPPER_CENTER
+  )
+
+  const {
+    tooltipPortal: copiedTooltipPortal,
+    openTooltip: openCopiedTooltip,
+    closeTooltip: closeCopiedTooltip,
+    originRef: copiedTooltipRef
+  } = useTooltip<HTMLDivElement>(MenuPosition.LOWER_CENTER)
+
+  const handleCopy = () => {
+    openCopiedTooltip()
+    SendClientSideEvent(atmosphere, 'Copied Standup Response Link', {
+      teamId: teamId,
+      meetingId: meetingId
+    })
+    setTimeout(() => {
+      closeCopiedTooltip()
+    }, 2000)
+  }
+
   return (
-    <ResponseWrapper
-      ref={ref}
-      status={status}
-      onTransitionEnd={onTransitionEnd}
-      isSingleColumn={isSingleColumn}
-    >
+    <ResponseWrapper ref={ref} status={status} onTransitionEnd={onTransitionEnd}>
       <ResponseHeader>
-        <Avatar picture={picture} size={48} />
+        <Avatar picture={picture} className='h-12 w-12' />
         <TeamMemberName>
           {preferredName}
           {response && (
@@ -228,6 +240,18 @@ const TeamPromptResponseCard = (props: Props) => {
             />
           )}
         </TeamMemberName>
+        {response && (
+          <CopyToClipboard text={responsePermalink} onCopy={handleCopy}>
+            <div
+              className='ml-auto h-7 rounded-full bg-transparent p-0 text-slate-500 hover:bg-slate-300 hover:text-slate-600'
+              onMouseEnter={openTooltip}
+              onMouseLeave={closeTooltip}
+              ref={mergeRefs(originRef, copiedTooltipRef)}
+            >
+              <Link className='h-7 w-7 cursor-pointer p-0.5' />
+            </div>
+          </CopyToClipboard>
+        )}
       </ResponseHeader>
       <ResponseCard
         isEmpty={isEmptyResponse}
@@ -264,6 +288,8 @@ const TeamPromptResponseCard = (props: Props) => {
           </>
         )}
       </ResponseCard>
+      {tooltipPortal('Copy permalink')}
+      {copiedTooltipPortal('Copied!')}
     </ResponseWrapper>
   )
 }

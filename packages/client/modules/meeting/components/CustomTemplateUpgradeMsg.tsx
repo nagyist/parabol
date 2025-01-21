@@ -1,13 +1,12 @@
 import {keyframes} from '@emotion/core'
 import styled from '@emotion/styled'
-import React from 'react'
 import {useHistory} from 'react-router'
 import customTemplate from '../../../../../static/images/illustrations/customTemplate.png'
+import {MeetingTypeEnum} from '../../../__generated__/TeamInvitationQuery.graphql'
 import FloatingActionButton from '../../../components/FloatingActionButton'
 import useAtmosphere from '../../../hooks/useAtmosphere'
-import SendClientSegmentEventMutation from '../../../mutations/SendClientSegmentEventMutation'
 import {BezierCurve} from '../../../types/constEnums'
-import {MeetingTypeEnum} from '../../../__generated__/TeamInvitationQuery.graphql'
+import SendClientSideEvent from '../../../utils/SendClientSideEvent'
 
 const fadein = keyframes`
 0% { opacity: 0; }
@@ -79,7 +78,7 @@ const CustomTempateUpgradeMsg = (props: Props) => {
   const atmosphere = useAtmosphere()
 
   const handleClick = () => {
-    SendClientSegmentEventMutation(atmosphere, 'Upgrade CTA Clicked', {
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Clicked', {
       upgradeCTALocation: 'createNewTemplate',
       meetingType
     })

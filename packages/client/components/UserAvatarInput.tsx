@@ -1,6 +1,6 @@
 import styled from '@emotion/styled'
 import sanitizeSVG from '@mattkrick/sanitize-svg'
-import React from 'react'
+import {Close} from '@mui/icons-material'
 import jpgWithoutEXIF from '~/utils/jpgWithoutEXIF'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useMutationProps from '../hooks/useMutationProps'
@@ -9,7 +9,6 @@ import svgToPng from '../utils/svgToPng'
 import Avatar from './Avatar/Avatar'
 import AvatarInput from './AvatarInput'
 import DialogTitle from './DialogTitle'
-import {Close} from '@mui/icons-material'
 import FlatButton from './FlatButton'
 
 const AvatarBlock = styled('div')({
@@ -75,14 +74,14 @@ const UserAvatarInput = (props: Props) => {
       <div>
         {/* upload */}
         <AvatarBlock>
-          <Avatar picture={picture} size={96} />
+          <Avatar picture={picture} className='h-24 w-24' />
         </AvatarBlock>
         <AvatarInput error={error?.message} onSubmit={onSubmit} />
       </div>
       <div className='flex w-full justify-end'>
         <FlatButton
           onClick={handleClose}
-          className='mr-6 mb-6 bg-sky-500 font-semibold text-white duration-300 ease-in-out hover:bg-sky-700 focus:bg-sky-700'
+          className='mb-6 mr-6 bg-sky-500 font-semibold text-white duration-300 ease-in-out hover:bg-sky-700 focus:bg-sky-700'
         >
           {'Save'}
         </FlatButton>

@@ -1,15 +1,15 @@
 import styled from '@emotion/styled'
 import {OpenInNew} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo} from 'react'
+import {useMemo} from 'react'
 import {useFragment} from 'react-relay'
+import {JiraFieldMenu_stage$key} from '../__generated__/JiraFieldMenu_stage.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import {MenuProps} from '../hooks/useMenu'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
 import UpdateJiraDimensionFieldMutation from '../mutations/UpdateJiraDimensionFieldMutation'
 import {PALETTE} from '../styles/paletteV3'
 import {ExternalLinks, SprintPokerDefaults} from '../types/constEnums'
-import {JiraFieldMenu_stage$key} from '../__generated__/JiraFieldMenu_stage.graphql'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 import Menu from './Menu'
 import MenuItem from './MenuItem'
 import MenuItemHR from './MenuItemHR'
@@ -101,7 +101,7 @@ const JiraFieldMenu = (props: Props) => {
         'noreferrer'
       )
     }
-    SendClientSegmentEventMutation(atmosphere, 'Jira Missing Field Doc Link Clicked', {
+    SendClientSideEvent(atmosphere, 'Jira Missing Field Doc Link Clicked', {
       meetingId,
       teamId,
       taskId,

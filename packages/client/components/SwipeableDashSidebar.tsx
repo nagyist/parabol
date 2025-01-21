@@ -1,5 +1,6 @@
 import styled from '@emotion/styled'
-import React, {ReactNode, useCallback, useEffect, useState} from 'react'
+import * as React from 'react'
+import {ReactNode, useCallback, useEffect, useState} from 'react'
 import useEventCallback from '~/hooks/useEventCallback'
 import usePortal from '../hooks/usePortal'
 import {DECELERATE} from '../styles/animation'
@@ -78,8 +79,8 @@ const updateIsSwipe = (clientX: number, clientY: number, isRightDrawer: boolean)
         ? swipingRight
         : swipingLeft
       : isRightDrawer
-      ? swipingLeft
-      : swipingRight
+        ? swipingLeft
+        : swipingRight
   }
 }
 
@@ -120,18 +121,13 @@ const SwipeableDashSidebar = (props: Props) => {
   const SIDEBAR_WIDTH: number = sidebarWidth || NavSidebar.WIDTH
   const HYSTERESIS_THRESH = HYSTERESIS * SIDEBAR_WIDTH
 
-  useEffect(
-    () => {
-      openPortal()
-      return () => {
-        window.clearTimeout(swipe.peekTimeout)
-        hideSidebar()
-      }
-    },
-    [
-      /* eslint-disable-line react-hooks/exhaustive-deps*/
-    ]
-  )
+  useEffect(() => {
+    openPortal()
+    return () => {
+      window.clearTimeout(swipe.peekTimeout)
+      hideSidebar()
+    }
+  }, [])
 
   const hideSidebar = useCallback(() => {
     setX(0)

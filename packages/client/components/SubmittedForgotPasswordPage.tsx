@@ -1,5 +1,4 @@
 import styled from '@emotion/styled'
-import React from 'react'
 import useRouter from '../hooks/useRouter'
 import {emailLinkStyle} from '../modules/email/styles'
 import {ForgotPasswordResType} from '../mutations/EmailPasswordResetMutation'
@@ -9,6 +8,7 @@ import DialogTitle from './DialogTitle'
 import {AuthPageSlug, GotoAuthPage} from './GenericAuthentication'
 import GoogleOAuthButtonBlock from './GoogleOAuthButtonBlock'
 import IconLabel from './IconLabel'
+import MicrosoftOAuthButtonBlock from './MicrosoftOAuthButtonBlock'
 import PlainButton from './PlainButton/PlainButton'
 import PrimaryButton from './PrimaryButton'
 
@@ -81,7 +81,7 @@ const SubmittedForgotPasswordPage = (props: Props) => {
   }
 
   const copyTypes = {
-    goog: {
+    [ForgotPasswordResType.GOOGLE]: {
       title: 'Oops!',
       descriptionOne: 'It looks like you may have signed-up with Gmail.',
       descriptionTwo: (
@@ -96,7 +96,22 @@ const SubmittedForgotPasswordPage = (props: Props) => {
         </ButtonWrapper>
       )
     },
-    saml: {
+    [ForgotPasswordResType.MICROSOFT]: {
+      title: 'Oops!',
+      descriptionOne: 'It looks like you may have signed-up with Microsoft.',
+      descriptionTwo: (
+        <>
+          {`Try signing in with Microsoft or `}
+          {contactSupportCopy}
+        </>
+      ),
+      button: (
+        <ButtonWrapper>
+          <MicrosoftOAuthButtonBlock isCreate={false} invitationToken={token} />
+        </ButtonWrapper>
+      )
+    },
+    [ForgotPasswordResType.SAML]: {
       title: 'Oops!',
       descriptionOne: 'It looks like you may have signed-up using SSO.',
       descriptionTwo: (
@@ -111,7 +126,7 @@ const SubmittedForgotPasswordPage = (props: Props) => {
         </StyledPrimaryButton>
       )
     },
-    success: {
+    [ForgotPasswordResType.SUCCESS]: {
       title: 'You’re all set!',
       descriptionOne: 'We’ve sent you an email with password recovery instructions.',
       descriptionTwo: (

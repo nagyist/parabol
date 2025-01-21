@@ -1,10 +1,9 @@
 import styled from '@emotion/styled'
-import React from 'react'
 import AzureDevOpsSVG from './AzureDevOpsSVG'
 import GitHubSVG from './GitHubSVG'
 import GitLabSVG from './GitLabSVG'
-import JiraServerSVG from './JiraServerSVG'
 import JiraSVG from './JiraSVG'
+import JiraServerSVG from './JiraServerSVG'
 
 const iconLookup = {
   _xGitHubIssue: GitHubSVG,

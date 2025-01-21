@@ -1,19 +1,19 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {RefObject} from 'react'
+import {RefObject} from 'react'
 import {usePaginationFragment} from 'react-relay'
-import useAtmosphere from '~/hooks/useAtmosphere'
-import useTimeout from '~/hooks/useTimeout'
-import SetNotificationStatusMutation from '~/mutations/SetNotificationStatusMutation'
 import {
   NotificationDropdown_query$data,
   NotificationDropdown_query$key
 } from '~/__generated__/NotificationDropdown_query.graphql'
+import useAtmosphere from '~/hooks/useAtmosphere'
+import useTimeout from '~/hooks/useTimeout'
+import SetNotificationStatusMutation from '~/mutations/SetNotificationStatusMutation'
+import {NotificationDropdownPaginationQuery} from '../__generated__/NotificationDropdownPaginationQuery.graphql'
+import useClientSideTrack from '../hooks/useClientSideTrack'
 import useLoadNextOnScrollBottom from '../hooks/useLoadNextOnScrollBottom'
 import {MenuProps} from '../hooks/useMenu'
-import useSegmentTrack from '../hooks/useSegmentTrack'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
-import {NotificationDropdownPaginationQuery} from '../__generated__/NotificationDropdownPaginationQuery.graphql'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 import Menu from './Menu'
 import MenuItem from './MenuItem'
 import NotificationPicker from './NotificationPicker'
@@ -75,7 +75,7 @@ const NotificationDropdown = (props: Props) => {
     rootMargin: '8px'
   })
   const atmosphere = useAtmosphere()
-  useSegmentTrack('Notification Menu Opened', {})
+  useClientSideTrack('Notification Menu Opened', {})
   return (
     <Menu ariaLabel={'Select a notification'} {...menuProps}>
       {!hasNotifications && (
@@ -88,7 +88,7 @@ const NotificationDropdown = (props: Props) => {
         }
         const onClickFn = () => {
           SetNotificationStatusMutation(atmosphere, {notificationId, status: 'CLICKED'}, {})
-          SendClientSegmentEventMutation(atmosphere, 'Notification Clicked', {
+          SendClientSideEvent(atmosphere, 'Notification Clicked', {
             notificationType: type
           })
         }

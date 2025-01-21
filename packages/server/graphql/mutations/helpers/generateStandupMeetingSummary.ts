@@ -1,32 +1,32 @@
+import {getTeamPromptResponsesByMeetingId} from '../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
+import {TeamPromptMeeting} from '../../../postgres/types/Meeting'
 import OpenAIServerManager from '../../../utils/OpenAIServerManager'
 import {DataLoaderWorker} from '../../graphql'
-import canAccessAISummary from './canAccessAISummary'
-import {getTeamPromptResponsesByMeetingId} from '../../../postgres/queries/getTeamPromptResponsesByMeetingIds'
-import MeetingTeamPrompt from '../../../database/types/MeetingTeamPrompt'
+import isValid from '../../isValid'
+import canAccessAI from './canAccessAI'
 
 const generateStandupMeetingSummary = async (
-  meeting: MeetingTeamPrompt,
+  meeting: TeamPromptMeeting,
   dataLoader: DataLoaderWorker
 ) => {
-  const [facilitator, team] = await Promise.all([
-    dataLoader.get('users').loadNonNull(meeting.facilitatorUserId),
-    dataLoader.get('teams').loadNonNull(meeting.teamId)
-  ])
-  const isAISummaryAccessible = await canAccessAISummary(
-    team,
-    facilitator.featureFlags,
-    dataLoader,
-    'standup'
-  )
+  const team = await dataLoader.get('teams').loadNonNull(meeting.teamId)
+  const isAIAvailable = await canAccessAI(team, 'standup', dataLoader)
+  if (!isAIAvailable) return
 
-  if (!isAISummaryAccessible) return
   const responses = await getTeamPromptResponsesByMeetingId(meeting.id)
 
-  const contentToSummarize = responses.map((response) => response.plaintextContent)
-  if (contentToSummarize.length === 0) return
+  const userIds = responses.map((response) => response.userId)
+  const users = (await dataLoader.get('users').loadMany(userIds)).filter(isValid)
+
+  const contentWithUsers = responses.map((response, idx) => ({
+    content: response.plaintextContent,
+    user: users[idx]?.preferredName ?? 'Anonymous'
+  }))
+
+  if (contentWithUsers.length === 0) return
 
   const manager = new OpenAIServerManager()
-  const summary = await manager.getStandupSummary(contentToSummarize, meeting.meetingPrompt)
+  const summary = await manager.getStandupSummary(contentWithUsers, meeting.meetingPrompt)
   if (!summary) return
   return summary
 }

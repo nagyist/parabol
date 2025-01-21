@@ -1,34 +1,48 @@
 # PostgreSQL
 
-## Setup
-
-- pgadmin is at [http://localhost:5050](http://localhost:5050)
-- Connect using the values of `PGADMIN_DEFAULT_EMAIL` and `PGADMIN_DEFAULT_PASSWORD` from your `.env`
-- Click "Add New Server" and fill out the forms with your `.env` values
-
-  - General.name = POSTGRES_DB
-  - Connection.host = 'postgres' (hardcoded from docker-compose dev.yml, not from .env!)
-  - Connection.username = POSTGRES_USER
-  - Connection.password = POSTGRES_PASSWORD
-  - Connection.maintenanceDatabase = POSTGRES_DB
-  - Connection.port = POSTGRES_PORT
-
 ## Migrations
 
-This folder contains all the postgres migrations that have been run on the database.
-If your migration also requires a connection to RethinkDB, you can do that here, too.
-The recommended way to write a migration is to call `yarn pg:migrate create NAME`
-We no longer use pgm because we want every migration to run independently.
-In other words, migration 3 should have a guarantee that migration 2 has already run. PGM doesn't do this.
+Migrations are managed by Kysely, and on the CLI by [Kysely-CTL](https://github.com/kysely-org/kysely-ctl).
+Kysely-CTL keeps the same API as Knex, so if the docs are not great, you can use the knex migration docs, too.
+There are 3 ways migrations are triggered:
 
-## Migrating RethinkDB to PG (Massive Inserts)
+- Manually, calling `yarn kysely migrate:latest`, `yarn kysely migrate:up`, or `yarn kysely migrate:down`
+- After the app is built, calling `yarn predeploy` (this is run in prod, where the /migrations dir does not exist)
+- In dev, calling `yarn dev`, which uses PM2 to call `yarn kysely migrate:latest`
 
-To perform massive inserts, like migrating RethinkDB tables to PG, we use pg-promise, which offers a [simple pattern](https://github.com/vitaly-t/pg-promise/wiki/Data-Imports#massive-inserts).
+To create a new migration run `yarn kysely migrate:make NAME`
 
-Since most tables can't be read into the memory of our NodeJS container, we have to paginate the data.
-The easiest way to do that is indexing on `updatedAt` in RethinkDB and paginating on that field.
-This is also beneficial because any updates that happen during the migration will end up on the last page.
-Note that is requires every write to the RethinkDB table to update the `updatedAt` field!
+### Rebasing Migrations
+
+Rebasing migrations means deleting all the migrations in /migrations and starting fresh.
+It is time to rebase migrations when one of the following is true:
+
+- a migration has a dependency that you want to remove from the project
+- there are too many migrations and they're slowing down CI/CD
+
+To rebase:
+
+1. create a new DB in postgres & change it in the .env, e.g. `POSTGRES_DB='init1'`.
+2. run `yarn kysely migrate:latest` to build it
+3. goto pgadmin, right click the database and click backup
+
+- General Tab
+  - Filename: init.sql
+  - Encoding: UTF8
+- Data Options
+  - Sections: Pre-data, Data, Post-data
+  - Do not save: Owner
+- Query Options
+  - Use Insert Commands
+  - On conflict do nothing to INSERT command
+- Table options
+  - Exclude Patterns: Tables: `_*` (excludes `_migration`, `_migrationLock`)
+
+4. `yarn kysely migrate:make init` to create a new initial migration
+5. Copy the contents of the old `_init.ts` migration to the new file you just created & just replace the SQL.
+   At the beginning of the file, update the old `migrationTableName` so we delete the old migration table
+6. Delete all old migrations
+7. Increment the table version number in `kyselyMigrations.ts` for `migrationTableName`, e.g. `_migrationV3`
 
 ### Queries
 
@@ -56,13 +70,3 @@ Parameters are capped at 16-bit, so if you're doing a bulk insert, you'll need t
 In other words, if `# rows * columns per row > 65,535` you need to do it in batches.
 `pg-protocol` shows this here: <https://github.com/brianc/node-postgres/blob/master/packages/pg-protocol/src/serializer.ts#L155>
 Issue here: <https://github.com/brianc/node-postgres/issues/581>
-
-#### Too many connections
-
-Sometimes pg pool will hit its connection limit. This should never happen in prod, but happens on occassion in dev.
-You'll know it's happening because PG will say there are too many connections.
-To fix, you can run the following SQL to remove all the connections except the one that is running the script
-
-```sql
-select pg_terminate_backend(pid) from pg_stat_activity where datname='parabol-saas' AND pid <> pg_backend_pid();
-```

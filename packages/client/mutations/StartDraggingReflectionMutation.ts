@@ -4,9 +4,9 @@ import {matchPath} from 'react-router-dom'
 import {Disposable, RecordSourceProxy} from 'relay-runtime'
 import {StartDraggingReflectionMutation_meeting$data} from '~/__generated__/StartDraggingReflectionMutation_meeting.graphql'
 import Atmosphere from '../Atmosphere'
+import {StartDraggingReflectionMutation as TStartDraggingReflectionMutation} from '../__generated__/StartDraggingReflectionMutation.graphql'
 import {ClientRetroReflection} from '../types/clientSchema'
 import {LocalHandlers, SharedUpdater} from '../types/relayMutations'
-import {StartDraggingReflectionMutation as TStartDraggingReflectionMutation} from '../__generated__/StartDraggingReflectionMutation.graphql'
 
 graphql`
   fragment StartDraggingReflectionMutation_meeting on StartDraggingReflectionPayload {
@@ -81,7 +81,7 @@ export const startDraggingReflectionMeetingUpdater: SharedUpdater<
       reflection.setValue(false, 'isDropping')
       reflection.setLinkedRecord(remoteDrag, 'remoteDrag')
       // cancel spotlight, too
-      const meeting = meetingId !== null ? store.get(meetingId) : null
+      const meeting = meetingId ? store.get(meetingId) : null
       meeting?.setValue(null, 'spotlightReflection')
     } else {
       // viewer wins

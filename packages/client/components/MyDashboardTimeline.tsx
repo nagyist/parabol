@@ -1,16 +1,16 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {Suspense} from 'react'
+import {Suspense} from 'react'
 import {PreloadedQuery, usePreloadedQuery} from 'react-relay'
 import useDocumentTitle from '~/hooks/useDocumentTitle'
-import {DashTimeline} from '../types/constEnums'
 import {MyDashboardTimelineQuery} from '../__generated__/MyDashboardTimelineQuery.graphql'
+import {DashTimeline} from '../types/constEnums'
 import ErrorBoundary from './ErrorBoundary'
 import TimelineFeedList from './TimelineFeedList'
+import TimelineHeader from './TimelineHeader'
 import TimelineLoadingEvents from './TimelineLoadingEvents'
 import TimelineRightDrawer from './TimelineRightDrawer'
 import TimelineSuggestedAction from './TimelineSuggestedAction'
-import TimelineHeader from './TimelineHeader'
 
 interface Props {
   queryRef: PreloadedQuery<MyDashboardTimelineQuery>
@@ -20,6 +20,7 @@ const TimelineFeed = styled('div')({
   display: 'flex',
   justifyContent: 'center',
   flex: 1,
+  height: 'auto',
   paddingLeft: DashTimeline.MIN_PADDING,
   paddingRight: DashTimeline.MIN_PADDING,
   paddingTop: DashTimeline.MIN_PADDING
@@ -33,8 +34,7 @@ export const TimelineFeedItems = styled('div')({
 
 const FeedAndDrawer = styled('div')({
   display: 'flex',
-  height: '100%',
-  overflow: 'auto'
+  height: 'unset'
 })
 
 const MyDashboardTimeline = (props: Props) => {
@@ -47,6 +47,7 @@ const MyDashboardTimeline = (props: Props) => {
         $userIds: [ID!]
         $eventTypes: [TimelineEventEnum!]
         $teamIds: [ID!]
+        $archived: Boolean
       ) {
         viewer {
           ...TimelineSuggestedAction_viewer

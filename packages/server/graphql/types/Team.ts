@@ -9,13 +9,13 @@ import {
 } from 'graphql'
 import isTaskPrivate from 'parabol-client/utils/isTaskPrivate'
 import toTeamMemberId from 'parabol-client/utils/relay/toTeamMemberId'
-import getRethink from '../../database/rethinkDriver'
-import MassInvitationDB from '../../database/types/MassInvitation'
-import Task from '../../database/types/Task'
+import {Security, Threshold} from '../../../client/types/constEnums'
 import ITeam from '../../database/types/Team'
-import db from '../../db'
+import generateRandomString from '../../generateRandomString'
+import getKysely from '../../postgres/getKysely'
 import {getUserId, isSuperUser, isTeamMember, isUserBillingLeader} from '../../utils/authorization'
 import standardError from '../../utils/standardError'
+import isValid from '../isValid'
 import connectionFromTasks from '../queries/helpers/connectionFromTasks'
 import {GQLContext} from './../graphql'
 import AgendaItem from './AgendaItem'
@@ -24,13 +24,11 @@ import MassInvitation from './MassInvitation'
 import MeetingTypeEnum from './MeetingTypeEnum'
 import NewMeeting from './NewMeeting'
 import Organization from './Organization'
-import ReflectPrompt from './ReflectPrompt'
 import {TaskConnection} from './Task'
 import TeamInvitation from './TeamInvitation'
 import TeamMeetingSettings from './TeamMeetingSettings'
 import TeamMember from './TeamMember'
 import TemplateScale from './TemplateScale'
-import TierEnum from './TierEnum'
 
 const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
   name: 'Team',
@@ -77,28 +75,34 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
         {authToken, dataLoader}: GQLContext
       ) => {
         if (!isTeamMember(authToken, teamId)) return null
-        const r = await getRethink()
+        const pg = getKysely()
         const viewerId = getUserId(authToken)
         const teamMemberId = toTeamMemberId(teamId, viewerId)
         const invitationTokens = await dataLoader
           .get('massInvitationsByTeamMemberId')
           .load(teamMemberId)
-        const [newestInvitationToken] = invitationTokens
+        const matchingInvitation = invitationTokens.find((token) => token.meetingId === meetingId)
         // if the token is valid, return it
-        if (newestInvitationToken?.expiration ?? new Date(0) > new Date())
-          return newestInvitationToken
-        // if the token is not valid, delete it to keep the table clean of expired things
-        if (newestInvitationToken) {
-          await r
-            .table('MassInvitation')
-            .getAll(teamMemberId, {index: 'teamMemberId'})
-            .delete()
-            .run()
+        if ((matchingInvitation?.expiration ?? new Date(0)) > new Date()) {
+          return matchingInvitation
         }
-        const massInvitation = new MassInvitationDB({meetingId, teamMemberId})
-        await r.table('MassInvitation').insert(massInvitation, {conflict: 'replace'}).run()
-        invitationTokens.length = 1
-        invitationTokens[0] = massInvitation
+
+        // if there is no matching token, let's use the opportunity to clean up old tokens
+        if (invitationTokens.length > 0) {
+          await pg
+            .deleteFrom('MassInvitation')
+            .where('teamMemberId', '=', teamMemberId)
+            .where('expiration', '<', new Date(Date.now()))
+            .execute()
+        }
+        const massInvitation = {
+          id: generateRandomString(Security.MASS_INVITATION_TOKEN_LENGTH),
+          meetingId,
+          teamMemberId,
+          expiration: new Date(Date.now() + Threshold.MASS_INVITATION_TOKEN_LIFESPAN)
+        }
+        await pg.insertInto('MassInvitation').values(massInvitation).execute()
+        dataLoader.get('massInvitationsByTeamMemberId').clear(teamMemberId)
         return massInvitation
       }
     },
@@ -123,14 +127,6 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
       type: GraphQLISO8601Type,
       description: 'The datetime the team was last updated'
     },
-    customPhaseItems: {
-      type: new GraphQLList(ReflectPrompt),
-      deprecationReason: 'Field no longer needs to exist for now',
-      resolve: () => {
-        // not useful for retros since there is no templateId filter
-        return []
-      }
-    },
     teamInvitations: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(TeamInvitation))),
       description: 'The outstanding invitations to join the team',
@@ -143,7 +139,7 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
         return dataLoader.get('teamInvitationsByTeamId').load(teamId)
       }
     },
-    isLead: {
+    isViewerLead: {
       type: new GraphQLNonNull(GraphQLBoolean),
       description: 'true if the viewer is the team lead, else false',
       resolve: async (
@@ -154,7 +150,7 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
         if (!isTeamMember(authToken, teamId)) return false
         const viewerId = getUserId(authToken)
         const teamMemberId = toTeamMemberId(teamId, viewerId)
-        const teamMember = await dataLoader.get('teamMembers').load(teamMemberId)
+        const teamMember = await dataLoader.get('teamMembers').loadNonNull(teamMemberId)
         return !!teamMember.isLead
       }
     },
@@ -204,14 +200,11 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
     scales: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(TemplateScale))),
       description: 'The list of scales this team can use',
-      resolve: async ({id: teamId}: {id: string}, {}, {dataLoader}: GQLContext) => {
-        const activeTeamScales = await dataLoader.get('scalesByTeamId').load(teamId)
-        const publicScales = await db.read('starterScales', 'aGhostTeam')
-        const activeScales = [...activeTeamScales, ...publicScales]
-        const uniqueScales = activeScales.filter(
-          (scale, index) => index === activeScales.findIndex((obj) => obj.id === scale.id)
-        )
-        return uniqueScales
+      resolve: async ({id: teamId}: {id: string}, _args, {dataLoader}: GQLContext) => {
+        const availableScales = await dataLoader
+          .get('scalesByTeamId')
+          .loadMany([teamId, 'aGhostTeam'])
+        return availableScales.filter(isValid).flat()
       }
     },
     activeMeetings: {
@@ -253,10 +246,6 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
         return null
       }
     },
-    tier: {
-      type: new GraphQLNonNull(TierEnum),
-      description: 'The level of access to features on the parabol site'
-    },
     organization: {
       type: new GraphQLNonNull(Organization),
       resolve: async (
@@ -264,7 +253,7 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
         _args: unknown,
         {authToken, dataLoader}: GQLContext
       ) => {
-        const organization = await dataLoader.get('organizations').load(orgId)
+        const organization = await dataLoader.get('organizations').loadNonNull(orgId)
         // TODO this is bad, we should probably just put the perms on each field in the org
         if (!isTeamMember(authToken, teamId)) {
           return {
@@ -311,7 +300,7 @@ const Team: GraphQLObjectType = new GraphQLObjectType<ITeam, GQLContext>({
         }
         const viewerId = getUserId(authToken)
         const allTasks = await dataLoader.get('tasksByTeamId').load(teamId)
-        const tasks = allTasks.filter((task: Task) => {
+        const tasks = allTasks.filter((task) => {
           if (!task.userId || (isTaskPrivate(task.tags) && task.userId !== viewerId)) return false
           return true
         })

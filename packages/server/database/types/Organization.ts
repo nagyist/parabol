@@ -1,6 +1,7 @@
 import generateUID from '../../generateUID'
-import CreditCard from './CreditCard'
-import {TierEnum} from './Invoice'
+import {TierEnum} from '../../graphql/public/resolverTypes'
+import {CreditCard} from '../../postgres/select'
+import {defaultTier} from '../../utils/defaultTier'
 
 interface Input {
   id?: string
@@ -10,11 +11,11 @@ interface Input {
   createdAt?: Date
   name: string
   picture?: string
-  tier: TierEnum
+  tier?: TierEnum
   updatedAt?: Date
   showConversionModal?: boolean
   payLaterClickCount?: number
-  featureFlags?: string[]
+  useAI?: boolean
 }
 
 export default class Organization {
@@ -34,10 +35,11 @@ export default class Organization {
   upcomingInvoiceEmailSentAt?: Date
   tier: TierEnum
   tierLimitExceededAt?: Date | null
+  trialStartDate?: Date | null
   scheduledLockAt?: Date | null
   lockedAt?: Date | null
+  useAI: boolean
   updatedAt: Date
-  featureFlags?: string[]
   constructor(input: Input) {
     const {
       id,
@@ -50,7 +52,8 @@ export default class Organization {
       showConversionModal,
       payLaterClickCount,
       picture,
-      tier
+      tier,
+      useAI
     } = input
     this.id = id || generateUID()
     this.activeDomain = activeDomain
@@ -59,9 +62,10 @@ export default class Organization {
     this.updatedAt = updatedAt || new Date()
     this.creditCard = creditCard
     this.name = name
-    this.tier = tier
+    this.tier = tier ?? defaultTier
     this.picture = picture
     this.showConversionModal = showConversionModal === null ? undefined : showConversionModal
     this.payLaterClickCount = payLaterClickCount || 0
+    this.useAI = useAI ?? true
   }
 }

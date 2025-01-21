@@ -1,14 +1,14 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo} from 'react'
+import {useMemo} from 'react'
 import {commitLocalUpdate, PreloadedQuery, usePreloadedQuery} from 'react-relay'
 import useSearchFilter from '~/hooks/useSearchFilter'
-import SendClientSegmentEventMutation from '~/mutations/SendClientSegmentEventMutation'
 import getNonNullEdges from '~/utils/getNonNullEdges'
+import SendClientSideEvent from '~/utils/SendClientSideEvent'
+import {GitLabScopingSearchFilterMenuQuery} from '../__generated__/GitLabScopingSearchFilterMenuQuery.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import {MenuProps} from '../hooks/useMenu'
 import SearchQueryId from '../shared/gqlIds/SearchQueryId'
-import {GitLabScopingSearchFilterMenuQuery} from '../__generated__/GitLabScopingSearchFilterMenuQuery.graphql'
 import Checkbox from './Checkbox'
 import {EmptyDropdownMenuItemLabel} from './EmptyDropdownMenuItemLabel'
 import Menu from './Menu'
@@ -141,7 +141,7 @@ const GitLabScopingSearchFilterMenu = (props: Props) => {
               : [...selectedProjectsIds, projectId]
             gitlabSearchQuery.setValue(newSelectedProjectsIds, 'selectedProjectsIds')
           })
-          SendClientSegmentEventMutation(atmosphere, 'Selected Poker Scope Project Filter', {
+          SendClientSideEvent(atmosphere, 'Selected Poker Scope Project Filter', {
             meetingId,
             projectId,
             service: 'gitlab'
